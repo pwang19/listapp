@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
-function EditableText({ value, onSave, className = "", style = {} }) {
+function EditableText({ value, onSave, className = '', style = {} }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
 
@@ -8,13 +9,11 @@ function EditableText({ value, onSave, className = "", style = {} }) {
     setEditValue(value);
   }, [value]);
 
-  const handleClick = () => {
-    setIsEditing(true);
-    setEditValue(value);
-  };
-
-  const handleChange = (event) => {
-    setEditValue(event.target.value);
+  const handleSave = () => {
+    if (editValue.trim() !== '') {
+      onSave(editValue.trim());
+    }
+    setIsEditing(false);
   };
 
   const handleKeyDown = (event) => {
@@ -26,42 +25,42 @@ function EditableText({ value, onSave, className = "", style = {} }) {
     }
   };
 
-  const handleBlur = () => {
-    handleSave();
-  };
-
-  const handleSave = () => {
-    if (editValue.trim() !== '') {
-      onSave(editValue.trim());
-    }
-    setIsEditing(false);
-  };
-
   if (isEditing) {
     return (
       <input
         type="text"
         value={editValue}
-        onChange={handleChange}
+        onChange={(event) => setEditValue(event.target.value)}
         onKeyDown={handleKeyDown}
-        onBlur={handleBlur}
+        onBlur={handleSave}
         autoFocus
         className={className}
         style={style}
+        aria-label="Edit text"
       />
     );
   }
 
   return (
-    <span 
-      onClick={handleClick} 
-      className={className} 
-      style={{ cursor: 'pointer', ...style }}
+    <button
+      type="button"
+      onClick={() => {
+        setIsEditing(true);
+        setEditValue(value);
+      }}
+      className={`editable-text ${className}`.trim()}
+      style={style}
     >
       {value}
-    </span>
+    </button>
   );
 }
 
-export default EditableText;
+EditableText.propTypes = {
+  value: PropTypes.string.isRequired,
+  onSave: PropTypes.func.isRequired,
+  className: PropTypes.string,
+  style: PropTypes.object,
+};
 
+export default EditableText;

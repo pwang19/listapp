@@ -1,159 +1,217 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import Modal from './Modal';
+import ConfirmModal from './ConfirmModal';
 
-function ImportExportModal({ isOpen, jsonData, onClose, onImport }) {
+function ImportExportModal({
+  isOpen,
+  jsonData,
+  onClose,
+  onImport,
+  hasExistingLists,
+}) {
   const [jsonText, setJsonText] = useState('');
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const [confirmMode, setConfirmMode] = useState(null);
+  const [pendingImport, setPendingImport] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
       setJsonText(jsonData);
+      setError('');
+      setStatus('');
+      setConfirmMode(null);
+      setPendingImport(null);
     }
   }, [isOpen, jsonData]);
 
-  if (!isOpen) return null;
+  const applyImport = (parsed, mode) => {
+    const result = onImport(parsed, mode);
+    if (!result || !result.ok) {
+      setError((result && result.error) || 'Import failed.');
+      return false;
+    }
+    setError('');
+    setStatus('');
+    onClose();
+    return true;
+  };
 
-  const handleImport = () => {
+  const parseInput = () => {
+    setError('');
+    setStatus('');
+    let parsed;
     try {
-      const parsed = JSON.parse(jsonText);
-      onImport(parsed);
-      onClose();
-    } catch (error) {
-      alert('Invalid JSON format. Please check your JSON and try again.');
+      parsed = JSON.parse(jsonText);
+    } catch {
+      setError('Invalid JSON format. Check your JSON and try again.');
+      return null;
+    }
+    if (!Array.isArray(parsed)) {
+      setError('Imported data must be a JSON array of lists.');
+      return null;
+    }
+    return parsed;
+  };
+
+  const handleReplaceClick = () => {
+    const parsed = parseInput();
+    if (!parsed) return;
+    if (hasExistingLists) {
+      setPendingImport(parsed);
+      setConfirmMode('replace');
+      return;
+    }
+    applyImport(parsed, 'replace');
+  };
+
+  const handleMergeClick = () => {
+    const parsed = parseInput();
+    if (!parsed) return;
+    if (hasExistingLists) {
+      setPendingImport(parsed);
+      setConfirmMode('merge');
+      return;
+    }
+    applyImport(parsed, 'replace');
+  };
+
+  const handleConfirm = () => {
+    const mode = confirmMode;
+    setConfirmMode(null);
+    if (pendingImport) {
+      applyImport(pendingImport, mode);
+    }
+    setPendingImport(null);
+  };
+
+  const handleCancelConfirm = () => {
+    setConfirmMode(null);
+    setPendingImport(null);
+  };
+
+  const handleCopy = async () => {
+    setError('');
+    try {
+      await navigator.clipboard.writeText(jsonText);
+      setStatus('Copied to clipboard.');
+    } catch {
+      setError('Could not copy to clipboard.');
     }
   };
 
+  const handleDownload = () => {
+    setError('');
+    try {
+      const blob = new Blob([jsonText], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `listapp-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setStatus('Download started.');
+    } catch {
+      setError('Could not download file.');
+    }
+  };
+
+  const handleClose = () => {
+    if (confirmMode) return;
+    onClose();
+  };
+
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        maxWidth: '700px',
-        width: '90%',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        position: 'relative',
-        maxHeight: '80vh',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={handleClose}
+        title="Import/Export Lists"
+        panelClassName="modal-panel--wide"
+      >
         <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            background: 'transparent',
-            border: 'none',
-            fontSize: '1.5rem',
-            cursor: 'pointer',
-            color: '#666',
-            padding: '0',
-            width: '24px',
-            height: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '4px'
-          }}
-          onMouseEnter={(e) => e.target.style.color = '#ff6b6b'}
-          onMouseLeave={(e) => e.target.style.color = '#666'}
+          type="button"
+          className="icon-button modal-close"
+          onClick={handleClose}
+          aria-label="Close"
         >
           ×
         </button>
-        
-        <h2 style={{ 
-          marginTop: 0, 
-          marginBottom: '1.5rem',
-          fontSize: '1.5rem',
-          color: '#333',
-          paddingRight: '2rem'
-        }}>
-          Import/Export Lists
-        </h2>
 
-        <div style={{ 
-          marginBottom: '1.5rem',
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0
-        }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.9rem',
-            color: '#333',
-            fontWeight: '500'
-          }}>
-            JSON Data
-          </label>
+        <div className="field">
+          <label htmlFor="import-export-json">JSON Data</label>
           <textarea
+            id="import-export-json"
             value={jsonText}
-            onChange={(e) => setJsonText(e.target.value)}
-            placeholder="Paste or edit JSON data here..."
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              fontSize: '0.9rem',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              boxSizing: 'border-box',
-              minHeight: '300px',
-              resize: 'vertical',
-              fontFamily: 'monospace',
-              flex: 1
+            onChange={(e) => {
+              setJsonText(e.target.value);
+              setError('');
+              setStatus('');
             }}
+            placeholder="Paste or edit JSON data here..."
+            className="json-textarea"
+            spellCheck={false}
           />
         </div>
 
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'flex-end'
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '0.5rem 1.5rem',
-              fontSize: '0.9rem',
-              backgroundColor: '#f0f0f0',
-              color: '#333',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
+        {error ? (
+          <p className="form-feedback form-feedback--error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {status ? (
+          <p className="form-feedback form-feedback--ok" role="status">
+            {status}
+          </p>
+        ) : null}
+
+        <div className="button-row button-row--wrap">
+          <button type="button" className="btn btn-secondary" onClick={handleCopy}>
+            Copy
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={handleDownload}>
+            Download
+          </button>
+          <div className="button-row-spacer" />
+          <button type="button" className="btn btn-secondary" onClick={handleClose}>
             Cancel
           </button>
-          <button
-            onClick={handleImport}
-            style={{
-              padding: '0.5rem 1.5rem',
-              fontSize: '0.9rem',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Import
+          <button type="button" className="btn btn-secondary" onClick={handleMergeClick}>
+            Merge import
+          </button>
+          <button type="button" className="btn btn-primary" onClick={handleReplaceClick}>
+            Replace import
           </button>
         </div>
-      </div>
-    </div>
+      </Modal>
+
+      <ConfirmModal
+        isOpen={confirmMode === 'replace'}
+        message="Replace import will overwrite all current lists. Continue?"
+        confirmLabel="Replace"
+        onConfirm={handleConfirm}
+        onCancel={handleCancelConfirm}
+      />
+      <ConfirmModal
+        isOpen={confirmMode === 'merge'}
+        message="Merge import will combine lists by id/name. Continue?"
+        confirmLabel="Merge"
+        onConfirm={handleConfirm}
+        onCancel={handleCancelConfirm}
+      />
+    </>
   );
 }
 
-export default ImportExportModal;
+ImportExportModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  jsonData: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onImport: PropTypes.func.isRequired,
+  hasExistingLists: PropTypes.bool,
+};
 
+export default ImportExportModal;

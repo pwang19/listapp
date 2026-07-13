@@ -1,290 +1,292 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
+import PropTypes from 'prop-types';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import EditableText from './EditableText';
 import ConfirmModal from './ConfirmModal';
+import Modal from './Modal';
+import SortableRow from './SortableRow';
+import { TAG_PALETTE } from '../utils/constants';
+import { renderMarkdown } from '../utils/helpers';
 
-function ListItemModal({ isOpen, itemName, description, subItems = [], onClose, onArchive, onSaveChanges, onNameChange, onAddSubItem, onToggleSubItem, onDeleteSubItem }) {
+const subItemShape = PropTypes.shape({
+  id: PropTypes.string.isRequired,
+  text: PropTypes.string.isRequired,
+  complete: PropTypes.bool,
+});
+
+function ListItemModal({
+  isOpen,
+  itemName,
+  description,
+  dueDate = '',
+  tags = [],
+  subItems = [],
+  onClose,
+  onDelete,
+  onSaveChanges,
+  onNameChange,
+  onAddSubItem,
+  onToggleSubItem,
+  onDeleteSubItem,
+  onReorderSubItems,
+}) {
   const [descriptionValue, setDescriptionValue] = useState(description || '');
-  const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
+  const [dueDateValue, setDueDateValue] = useState(dueDate || '');
+  const [tagsValue, setTagsValue] = useState(tags || []);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [subItemInput, setSubItemInput] = useState('');
+  const [previewMarkdown, setPreviewMarkdown] = useState(false);
+  const descId = useId();
+  const dueId = useId();
+  const subInputId = useId();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
   useEffect(() => {
     if (isOpen) {
       setDescriptionValue(description || '');
+      setDueDateValue(dueDate || '');
+      setTagsValue(tags || []);
       setSubItemInput('');
-      setConfirmArchiveOpen(false);
+      setConfirmDeleteOpen(false);
+      setPreviewMarkdown(false);
     }
-  }, [isOpen, description]);
-
-  if (!isOpen) return null;
+  }, [isOpen, description, dueDate, tags]);
 
   const handleSave = () => {
-    onSaveChanges(descriptionValue);
+    onSaveChanges({
+      description: descriptionValue,
+      dueDate: dueDateValue,
+      tags: tagsValue,
+    });
     onClose();
   };
 
-  const handleArchiveClick = () => {
-    setConfirmArchiveOpen(true);
-  };
-
-  const handleConfirmArchive = () => {
-    setConfirmArchiveOpen(false);
-    onArchive();
+  const handleConfirmDelete = () => {
+    setConfirmDeleteOpen(false);
+    onDelete();
     onClose();
-  };
-
-  const handleCancelArchive = () => {
-    setConfirmArchiveOpen(false);
-  };
-
-  const handleNameSave = (newName) => {
-    if (onNameChange) {
-      onNameChange(newName);
-    }
   };
 
   const handleSubItemKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      if (subItemInput.trim() !== '') {
-        if (onAddSubItem) {
-          onAddSubItem(subItemInput.trim());
-        }
-        setSubItemInput('');
-      }
+    if (event.key === 'Enter' && subItemInput.trim() !== '') {
+      onAddSubItem(subItemInput.trim());
+      setSubItemInput('');
     }
   };
 
+  const toggleTag = (tagId) => {
+    setTagsValue((prev) =>
+      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
+    );
+  };
+
+  const handleClose = () => {
+    if (confirmDeleteOpen) return;
+    onClose();
+  };
+
+  const handleSubDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    onReorderSubItems(active.id, over.id);
+  };
+
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        maxWidth: '500px',
-        width: '90%',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        position: 'relative'
-      }}>
+    <>
+      <Modal isOpen={isOpen} onClose={handleClose} panelClassName="modal-panel--medium">
         <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            background: 'transparent',
-            border: 'none',
-            fontSize: '1.5rem',
-            cursor: 'pointer',
-            color: '#666',
-            padding: '0',
-            width: '24px',
-            height: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '4px'
-          }}
-          onMouseEnter={(e) => e.target.style.color = '#ff6b6b'}
-          onMouseLeave={(e) => e.target.style.color = '#666'}
+          type="button"
+          className="icon-button modal-close"
+          onClick={handleClose}
+          aria-label="Close"
         >
           ×
         </button>
-        
-        <h2 style={{ 
-          marginTop: 0, 
-          marginBottom: '1.5rem',
-          fontSize: '1.5rem',
-          color: '#333',
-          paddingRight: '2rem'
-        }}>
-          <EditableText 
-            value={itemName} 
-            onSave={handleNameSave}
+
+        <h2 className="modal-title modal-title--editable">
+          <EditableText
+            value={itemName}
+            onSave={onNameChange}
             style={{ fontSize: '1.5rem', fontWeight: 'bold' }}
           />
         </h2>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.9rem',
-            color: '#333',
-            fontWeight: '500'
-          }}>
-            Description
-          </label>
-          <textarea
-            value={descriptionValue}
-            onChange={(e) => setDescriptionValue(e.target.value)}
-            placeholder="Add a description..."
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              fontSize: '0.9rem',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              boxSizing: 'border-box',
-              minHeight: '100px',
-              resize: 'vertical',
-              fontFamily: 'inherit'
-            }}
+        <div className="field">
+          <div className="field-header">
+            <label htmlFor={descId}>Notes (Markdown)</label>
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => setPreviewMarkdown((v) => !v)}
+            >
+              {previewMarkdown ? 'Edit' : 'Preview'}
+            </button>
+          </div>
+          {previewMarkdown ? (
+            <div
+              className="markdown-preview"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(descriptionValue) }}
+            />
+          ) : (
+            <textarea
+              id={descId}
+              value={descriptionValue}
+              onChange={(e) => setDescriptionValue(e.target.value)}
+              placeholder="Add notes… supports **bold**, lists, links"
+              className="description-textarea"
+            />
+          )}
+        </div>
+
+        <div className="field">
+          <label htmlFor={dueId}>Due date</label>
+          <input
+            id={dueId}
+            type="date"
+            value={dueDateValue}
+            onChange={(e) => setDueDateValue(e.target.value)}
+            className="text-input"
           />
         </div>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.9rem',
-            color: '#333',
-            fontWeight: '500'
-          }}>
-            Sub-items
-          </label>
-          <div style={{
-            maxHeight: '200px',
-            overflowY: 'auto',
-            marginBottom: '0.5rem',
-            border: '1px solid #e0e0e0',
-            borderRadius: '4px',
-            padding: '0.5rem'
-          }}>
-            {subItems.length === 0 ? (
-              <p style={{ 
-                margin: '0.5rem 0', 
-                color: '#999', 
-                fontSize: '0.85rem',
-                fontStyle: 'italic'
-              }}>
-                No sub-items yet
-              </p>
-            ) : (
-              subItems.map((subItem, index) => (
-                <div 
-                  key={index} 
+        <div className="field">
+          <span className="field-label">Tags</span>
+          <div className="tag-picker">
+            {TAG_PALETTE.map((tag) => {
+              const active = tagsValue.includes(tag.id);
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  className={`tag-chip tag-chip--picker${active ? ' is-active' : ''}`}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem',
-                    marginBottom: '0.25rem',
-                    backgroundColor: subItem.complete ? '#f5f5f5' : 'transparent',
-                    borderRadius: '4px'
+                    backgroundColor: active ? `${tag.color}33` : '#f3f4f6',
+                    color: active ? tag.color : '#6b7785',
+                    borderColor: active ? tag.color : 'transparent',
                   }}
+                  onClick={() => toggleTag(tag.id)}
                 >
-                  <input
-                    type="checkbox"
-                    checked={subItem.complete || false}
-                    onChange={() => onToggleSubItem && onToggleSubItem(index)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <span
-                    style={{
-                      flex: 1,
-                      color: subItem.complete ? '#888' : '#333',
-                      textDecoration: subItem.complete ? 'line-through' : 'none',
-                      fontSize: '0.9rem'
-                    }}
-                  >
-                    {subItem.text}
-                  </span>
-                  <button
-                    onClick={() => onDeleteSubItem && onDeleteSubItem(index)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#666',
-                      cursor: 'pointer',
-                      fontSize: '1rem',
-                      padding: '0',
-                      width: '20px',
-                      height: '20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '4px'
-                    }}
-                    onMouseEnter={(e) => e.target.style.color = '#ff6b6b'}
-                    onMouseLeave={(e) => e.target.style.color = '#666'}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))
+                  {tag.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label" id={`${subInputId}-label`}>
+            Sub-items
+          </span>
+          <div className="subitems-box" role="group" aria-labelledby={`${subInputId}-label`}>
+            {subItems.length === 0 ? (
+              <p className="empty-hint">No sub-items yet</p>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleSubDragEnd}
+              >
+                <SortableContext
+                  items={subItems.map((s) => s.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {subItems.map((subItem) => {
+                    const checkboxId = `sub-${subItem.id}`;
+                    return (
+                      <SortableRow key={subItem.id} id={subItem.id} className="subitem-sortable">
+                        <div
+                          className={`subitem-row${subItem.complete ? ' is-complete' : ''}`}
+                        >
+                          <input
+                            id={checkboxId}
+                            type="checkbox"
+                            checked={subItem.complete || false}
+                            onChange={() => onToggleSubItem(subItem.id)}
+                          />
+                          <label htmlFor={checkboxId} className="subitem-label">
+                            {subItem.text}
+                          </label>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            onClick={() => onDeleteSubItem(subItem.id)}
+                            aria-label={`Delete sub-item ${subItem.text}`}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </SortableRow>
+                    );
+                  })}
+                </SortableContext>
+              </DndContext>
             )}
           </div>
           <input
+            id={subInputId}
             type="text"
             value={subItemInput}
             onChange={(e) => setSubItemInput(e.target.value)}
             onKeyDown={handleSubItemKeyDown}
             placeholder="Add a sub-item..."
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              fontSize: '0.9rem',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              boxSizing: 'border-box'
-            }}
+            aria-label="Add a sub-item"
+            className="text-input"
           />
         </div>
 
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'space-between'
-        }}>
+        <div className="button-row button-row--spread">
           <button
-            onClick={handleArchiveClick}
-            style={{
-              padding: '0.5rem 1.5rem',
-              fontSize: '0.9rem',
-              backgroundColor: '#ff6b6b',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+            type="button"
+            className="btn btn-danger"
+            onClick={() => setConfirmDeleteOpen(true)}
           >
             Archive
           </button>
-          <button
-            onClick={handleSave}
-            style={{
-              padding: '0.5rem 1.5rem',
-              fontSize: '0.9rem',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
+          <button type="button" className="btn btn-primary" onClick={handleSave}>
             Save Changes
           </button>
         </div>
-      </div>
+      </Modal>
+
       <ConfirmModal
-        isOpen={confirmArchiveOpen}
-        message={`Are you sure you want to archive "${itemName}"?`}
-        onConfirm={handleConfirmArchive}
-        onCancel={handleCancelArchive}
+        isOpen={confirmDeleteOpen}
+        message={`Archive "${itemName}"? You can restore it from Archived.`}
+        confirmLabel="Archive"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDeleteOpen(false)}
       />
-    </div>
+    </>
   );
 }
 
-export default ListItemModal;
+ListItemModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  itemName: PropTypes.string.isRequired,
+  description: PropTypes.string,
+  dueDate: PropTypes.string,
+  tags: PropTypes.arrayOf(PropTypes.string),
+  subItems: PropTypes.arrayOf(subItemShape),
+  onClose: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+  onSaveChanges: PropTypes.func.isRequired,
+  onNameChange: PropTypes.func.isRequired,
+  onAddSubItem: PropTypes.func.isRequired,
+  onToggleSubItem: PropTypes.func.isRequired,
+  onDeleteSubItem: PropTypes.func.isRequired,
+  onReorderSubItems: PropTypes.func.isRequired,
+};
 
+export default ListItemModal;

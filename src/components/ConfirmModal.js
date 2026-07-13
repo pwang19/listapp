@@ -1,75 +1,37 @@
 import React from 'react';
+import PropTypes from 'prop-types';
+import Modal from './Modal';
 
-function ConfirmModal({ isOpen, message, onConfirm, onCancel }) {
-  if (!isOpen) return null;
-
+function ConfirmModal({ isOpen, message, onConfirm, onCancel, confirmLabel = 'Confirm' }) {
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        maxWidth: '400px',
-        width: '90%',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-      }}>
-        <p style={{ 
-          marginTop: 0, 
-          marginBottom: '1.5rem',
-          fontSize: '1rem',
-          color: '#333'
-        }}>
-          {message}
-        </p>
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'space-between'
-        }}>
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '0.5rem 1.5rem',
-              fontSize: '0.9rem',
-              backgroundColor: '#f0f0f0',
-              color: '#333',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              padding: '0.5rem 1.5rem',
-              fontSize: '0.9rem',
-              backgroundColor: '#ff6b6b',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Confirm
-          </button>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onCancel}
+      panelClassName="modal-panel--narrow"
+      zIndex={1100}
+      labelledBy="confirm-modal-message"
+    >
+      <p id="confirm-modal-message" className="confirm-message">
+        {message}
+      </p>
+      <div className="button-row button-row--spread">
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="button" className="btn btn-danger" onClick={onConfirm}>
+          {confirmLabel}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-export default ConfirmModal;
+ConfirmModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  message: PropTypes.string.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  confirmLabel: PropTypes.string,
+};
 
+export default ConfirmModal;

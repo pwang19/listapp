@@ -1,220 +1,275 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import PropTypes from 'prop-types';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import EditableText from './EditableText';
 import ListItemDisplay from './ListItemDisplay';
 import ListItemModal from './ListItemModal';
+import { LIST_COLORS, LIST_ICONS } from '../utils/constants';
+
+const itemShape = PropTypes.shape({
+  id: PropTypes.string.isRequired,
+  text: PropTypes.string.isRequired,
+  complete: PropTypes.bool,
+  description: PropTypes.string,
+  dueDate: PropTypes.string,
+  tags: PropTypes.arrayOf(PropTypes.string),
+  subItems: PropTypes.array,
+});
 
 function List({
+  id: listId,
   name,
+  color = 'slate',
+  icon = '📋',
   items = [],
+  itemFilter = 'all',
+  searchQuery = '',
+  tagFilter = '',
   onNameChange,
   onDelete,
   onAddItem,
   onItemCheckboxChange,
   onItemNameChange,
-  onItemDescriptionChange,
+  onItemSave,
   onAddSubItem,
   onToggleSubItem,
   onDeleteSubItem,
-  onArchiveItem,
-  onArchiveCompletedItems
+  onDeleteItem,
+  onDeleteCompletedItems,
+  onReorderItems,
+  onReorderSubItems,
+  onSetListStyle,
 }) {
   const [inputValue, setInputValue] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedItemIndex, setSelectedItemIndex] = useState(null);
+  const [selectedItemId, setSelectedItemId] = useState(null);
 
-  const handleInputChange = (event) => {
-    setInputValue(event.target.value);
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const colorMeta = LIST_COLORS.find((c) => c.id === color) || LIST_COLORS[0];
+
+  const visibleItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return items.filter((item) => {
+      if (itemFilter === 'active' && item.complete) return false;
+      if (itemFilter === 'completed' && !item.complete) return false;
+      if (tagFilter && !(item.tags || []).includes(tagFilter)) return false;
+      if (!q) return true;
+      const hay = [
+        item.text,
+        item.description || '',
+        ...(item.subItems || []).map((s) => s.text),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, itemFilter, searchQuery, tagFilter]);
+
+  const selectedItem = items.find((item) => item.id === selectedItemId) || null;
 
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      if (inputValue.trim() !== '') {
-        if (onAddItem) {
-          onAddItem(inputValue.trim());
-        }
-        setInputValue('');
-      }
+    if (event.key === 'Enter' && inputValue.trim() !== '') {
+      onAddItem(inputValue.trim());
+      setInputValue('');
     }
   };
 
-  const handleCheckboxChange = (index) => {
-    if (onItemCheckboxChange) {
-      onItemCheckboxChange(index);
-    }
-  };
-
-  const handleItemNameClick = (index) => {
-    setSelectedItemIndex(index);
+  const handleItemNameClick = (itemId) => {
+    setSelectedItemId(itemId);
     setModalOpen(true);
   };
 
   const handleModalClose = () => {
     setModalOpen(false);
-    setSelectedItemIndex(null);
+    setSelectedItemId(null);
   };
 
-  const handleSaveDescription = (description) => {
-    if (selectedItemIndex !== null && onItemDescriptionChange) {
-      onItemDescriptionChange(selectedItemIndex, description);
-    }
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    onReorderItems(active.id, over.id);
   };
-
-  const handleItemNameChange = (newName) => {
-    if (selectedItemIndex !== null && onItemNameChange) {
-      onItemNameChange(selectedItemIndex, newName);
-    }
-  };
-
-  const handleAddSubItem = (subItemText) => {
-    if (selectedItemIndex !== null && subItemText.trim() !== '' && onAddSubItem) {
-      onAddSubItem(selectedItemIndex, subItemText.trim());
-    }
-  };
-
-  const handleToggleSubItemInModal = (subItemIndex) => {
-    if (selectedItemIndex !== null && onToggleSubItem) {
-      onToggleSubItem(selectedItemIndex, subItemIndex);
-    }
-  };
-
-  const handleDeleteSubItem = (subItemIndex) => {
-    if (selectedItemIndex !== null && onDeleteSubItem) {
-      onDeleteSubItem(selectedItemIndex, subItemIndex);
-    }
-  };
-
-  const handleArchiveItem = () => {
-    if (selectedItemIndex !== null && onArchiveItem) {
-      onArchiveItem(selectedItemIndex);
-      setSelectedItemIndex(null);
-      setModalOpen(false);
-    }
-  };
-
-  const handleArchiveClick = () => {
-    if (onArchiveCompletedItems) {
-      onArchiveCompletedItems();
-    }
-  }
 
   return (
-    <div style={{ 
-      border: '1px solid #ddd', 
-      borderRadius: '8px', 
-      padding: '1.5rem',
-      backgroundColor: '#f9f9f9',
-      minHeight: '400px',
-      position: 'relative'
-    }}>
+    <article
+      className="list-card"
+      data-list-id={listId}
+      style={{ borderTop: `4px solid ${colorMeta.value}` }}
+    >
       <button
+        type="button"
+        className="icon-button list-card-delete"
         onClick={onDelete}
-        style={{
-          position: 'absolute',
-          top: '1rem',
-          right: '1rem',
-          background: 'transparent',
-          border: 'none',
-          fontSize: '1.5rem',
-          cursor: 'pointer',
-          color: '#666',
-          padding: '0',
-          width: '24px',
-          height: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: '4px'
-        }}
-        onMouseEnter={(e) => e.target.style.color = '#ff6b6b'}
-        onMouseLeave={(e) => e.target.style.color = '#666'}
+        aria-label={`Delete list ${name}`}
       >
         ×
       </button>
-      <h2 style={{ 
-        marginTop: 0, 
-        marginBottom: '1rem',
-        textAlign: 'center',
-        color: '#333'
-      }}>
-        <EditableText 
-          value={name} 
-          onSave={onNameChange}
-          className="list-title"
-        />
-      </h2>
-      <ul style={{ 
-        listStyle: 'none', 
-        padding: 0, 
-        marginBottom: '1rem',
-        minHeight: '200px'
-      }}>
-        {items.map((item, index) => (
-          <li key={index} style={{ marginBottom: '0.5rem' }}>
-            <ListItemDisplay 
-              name={item.text}
-              isComplete={item.complete}
-              subItems={item.subItems || []}
-              onCheckboxChange={() => handleCheckboxChange(index)}
-              onNameClick={() => handleItemNameClick(index)}
-              onSubItemToggle={(subItemIndex) => {
-                if (onToggleSubItem) {
-                  onToggleSubItem(index, subItemIndex);
-                }
-              }}
-            />
-          </li>
-        ))}
-      </ul>
-      <div style={{ marginBottom: '1rem' }}>
+
+      <div className="list-card-header">
+        <span className="list-icon" aria-hidden="true">
+          {icon}
+        </span>
+        <h2 className="list-card-title">
+          <EditableText value={name} onSave={onNameChange} className="list-title" />
+        </h2>
+      </div>
+
+      <div className="list-style-row">
+        <label className="sr-only" htmlFor={`icon-${listId}`}>
+          List icon
+        </label>
+        <select
+          id={`icon-${listId}`}
+          className="style-select"
+          value={icon}
+          onChange={(e) => onSetListStyle({ icon: e.target.value })}
+          aria-label="List icon"
+        >
+          {LIST_ICONS.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor={`color-${listId}`}>
+          List color
+        </label>
+        <select
+          id={`color-${listId}`}
+          className="style-select"
+          value={color}
+          onChange={(e) => onSetListStyle({ color: e.target.value })}
+          aria-label="List color"
+        >
+          {LIST_COLORS.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {visibleItems.length === 0 ? (
+        <p className="empty-hint list-empty-hint">
+          {items.length === 0
+            ? 'No items yet. Add one below, then click a name to open details.'
+            : 'No items match the current filters.'}
+        </p>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={visibleItems.map((i) => i.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul className="list-items">
+              {visibleItems.map((item) => (
+                <li key={item.id}>
+                  <ListItemDisplay
+                    id={item.id}
+                    name={item.text}
+                    isComplete={item.complete}
+                    dueDate={item.dueDate}
+                    tags={item.tags || []}
+                    subItems={item.subItems || []}
+                    sortable
+                    onCheckboxChange={() => onItemCheckboxChange(item.id)}
+                    onNameClick={() => handleItemNameClick(item.id)}
+                    onSubItemToggle={(subItemId) => onToggleSubItem(item.id, subItemId)}
+                  />
+                </li>
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      <div className="list-card-actions">
         <input
           type="text"
           value={inputValue}
-          onChange={handleInputChange}
+          onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Add a new item..."
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            fontSize: '0.9rem',
-            borderRadius: '4px',
-            border: '1px solid #ccc',
-            boxSizing: 'border-box'
-          }}
+          aria-label={`Add item to ${name}`}
+          className="text-input"
+          data-list-add-item={listId}
         />
+        <button
+          type="button"
+          className="btn btn-danger btn-block"
+          onClick={onDeleteCompletedItems}
+        >
+          Archive completed
+        </button>
       </div>
-      <button
-        onClick={handleArchiveClick}
-        style={{
-          width: '100%',
-          padding: '0.5rem',
-          fontSize: '0.9rem',
-          backgroundColor: '#ff6b6b',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
-      >
-        Archive completed tasks
-      </button>
-      {selectedItemIndex !== null && items[selectedItemIndex] && (
+
+      {selectedItem ? (
         <ListItemModal
           isOpen={modalOpen}
-          itemName={items[selectedItemIndex]?.text || ''}
-          description={items[selectedItemIndex]?.description || ''}
-          subItems={items[selectedItemIndex]?.subItems || []}
+          itemName={selectedItem.text}
+          description={selectedItem.description || ''}
+          dueDate={selectedItem.dueDate || ''}
+          tags={selectedItem.tags || []}
+          subItems={selectedItem.subItems || []}
           onClose={handleModalClose}
-          onArchive={handleArchiveItem}
-          onSaveChanges={handleSaveDescription}
-          onNameChange={handleItemNameChange}
-          onAddSubItem={handleAddSubItem}
-          onToggleSubItem={handleToggleSubItemInModal}
-          onDeleteSubItem={handleDeleteSubItem}
+          onDelete={() => {
+            onDeleteItem(selectedItem.id);
+            handleModalClose();
+          }}
+          onSaveChanges={(patch) => onItemSave(selectedItem.id, patch)}
+          onNameChange={(newName) => onItemNameChange(selectedItem.id, newName)}
+          onAddSubItem={(text) => onAddSubItem(selectedItem.id, text)}
+          onToggleSubItem={(subItemId) => onToggleSubItem(selectedItem.id, subItemId)}
+          onDeleteSubItem={(subItemId) => onDeleteSubItem(selectedItem.id, subItemId)}
+          onReorderSubItems={(activeId, overId) =>
+            onReorderSubItems(selectedItem.id, activeId, overId)
+          }
         />
-      )}
-    </div>
+      ) : null}
+    </article>
   );
 }
 
-export default List;
+List.propTypes = {
+  id: PropTypes.string.isRequired,
+  name: PropTypes.string.isRequired,
+  color: PropTypes.string,
+  icon: PropTypes.string,
+  items: PropTypes.arrayOf(itemShape),
+  itemFilter: PropTypes.string,
+  searchQuery: PropTypes.string,
+  tagFilter: PropTypes.string,
+  onNameChange: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+  onAddItem: PropTypes.func.isRequired,
+  onItemCheckboxChange: PropTypes.func.isRequired,
+  onItemNameChange: PropTypes.func.isRequired,
+  onItemSave: PropTypes.func.isRequired,
+  onAddSubItem: PropTypes.func.isRequired,
+  onToggleSubItem: PropTypes.func.isRequired,
+  onDeleteSubItem: PropTypes.func.isRequired,
+  onDeleteItem: PropTypes.func.isRequired,
+  onDeleteCompletedItems: PropTypes.func.isRequired,
+  onReorderItems: PropTypes.func.isRequired,
+  onReorderSubItems: PropTypes.func.isRequired,
+  onSetListStyle: PropTypes.func.isRequired,
+};
 
+export default List;

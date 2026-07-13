@@ -1,59 +1,119 @@
-import React from 'react';
+import React, { useId } from 'react';
+import PropTypes from 'prop-types';
+import { TAG_PALETTE } from '../utils/constants';
+import { isOverdue, isDueSoon } from '../utils/helpers';
+import SortableRow from './SortableRow';
 
-function ListItemDisplay({ name, isComplete, onCheckboxChange, onNameClick, subItems = [], onSubItemToggle }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <input 
-          type="checkbox" 
+const subItemShape = PropTypes.shape({
+  id: PropTypes.string.isRequired,
+  text: PropTypes.string.isRequired,
+  complete: PropTypes.bool,
+});
+
+function ListItemDisplay({
+  id,
+  name,
+  isComplete,
+  dueDate = '',
+  tags = [],
+  onCheckboxChange,
+  onNameClick,
+  subItems = [],
+  onSubItemToggle,
+  sortable = false,
+}) {
+  const checkboxId = useId();
+  const overdue = isOverdue(dueDate, isComplete);
+  const dueSoon = isDueSoon(dueDate, isComplete);
+
+  const body = (
+    <div className="list-item">
+      <div className="list-item-main">
+        <input
+          id={checkboxId}
+          type="checkbox"
           checked={isComplete}
           onChange={onCheckboxChange}
         />
-        <span
+        <button
+          type="button"
+          className={`item-name-button${isComplete ? ' is-complete' : ''}`}
           onClick={onNameClick}
-          style={{ 
-            color: isComplete ? '#888' : 'black',
-            textDecoration: isComplete ? 'line-through' : 'none',
-            cursor: 'pointer'
-          }}
+          aria-label={`Open details for ${name}`}
         >
           {name}
-        </span>
+        </button>
+        {dueDate ? (
+          <span
+            className={`due-badge${overdue ? ' is-overdue' : ''}${dueSoon ? ' is-due-soon' : ''}`}
+          >
+            {dueDate}
+          </span>
+        ) : null}
       </div>
-      {subItems.length > 0 && (
-        <div style={{ marginTop: '0.5rem', marginLeft: '2rem' }}>
-          {subItems.map((subItem, index) => (
-            <div
-              key={index}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                marginBottom: '0.25rem'
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={subItem.complete || false}
-                onChange={() => onSubItemToggle && onSubItemToggle(index)}
-                style={{ cursor: 'pointer' }}
-              />
+      {tags.length > 0 ? (
+        <div className="tag-row">
+          {tags.map((tagId) => {
+            const tag = TAG_PALETTE.find((t) => t.id === tagId);
+            if (!tag) return null;
+            return (
               <span
-                style={{
-                  color: subItem.complete ? '#888' : '#666',
-                  textDecoration: subItem.complete ? 'line-through' : 'none',
-                  fontSize: '0.85rem'
-                }}
+                key={tagId}
+                className="tag-chip"
+                style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
               >
-                {subItem.text}
+                {tag.label}
               </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      )}
+      ) : null}
+      {subItems.length > 0 ? (
+        <div className="inline-subitems">
+          {subItems.map((subItem) => {
+            const subId = `${id}-sub-${subItem.id}`;
+            return (
+              <div key={subItem.id} className="inline-subitem">
+                <input
+                  id={subId}
+                  type="checkbox"
+                  checked={subItem.complete || false}
+                  onChange={() => onSubItemToggle && onSubItemToggle(subItem.id)}
+                />
+                <label
+                  htmlFor={subId}
+                  className={`inline-subitem-label${subItem.complete ? ' is-complete' : ''}`}
+                >
+                  {subItem.text}
+                </label>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
-  )
+  );
+
+  if (!sortable) return body;
+
+  return (
+    <SortableRow id={id} className="item-sortable">
+      {body}
+    </SortableRow>
+  );
 }
 
-export default ListItemDisplay;
+ListItemDisplay.propTypes = {
+  id: PropTypes.string.isRequired,
+  name: PropTypes.string.isRequired,
+  isComplete: PropTypes.bool,
+  dueDate: PropTypes.string,
+  tags: PropTypes.arrayOf(PropTypes.string),
+  onCheckboxChange: PropTypes.func.isRequired,
+  onNameClick: PropTypes.func.isRequired,
+  subItems: PropTypes.arrayOf(subItemShape),
+  onSubItemToggle: PropTypes.func,
+  sortable: PropTypes.bool,
+};
 
+export default ListItemDisplay;
