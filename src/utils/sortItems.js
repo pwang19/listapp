@@ -1,3 +1,8 @@
+function prioritySortKey(priority) {
+  if (!priority) return 4;
+  return priority;
+}
+
 export function sortItems(items, sortMode = 'manual') {
   if (sortMode === 'manual') return items;
   const sorted = [...items];
@@ -14,7 +19,9 @@ export function sortItems(items, sortMode = 'manual') {
     case 'completedLast':
       return sorted.sort((a, b) => Number(a.complete) - Number(b.complete));
     case 'priority':
-      return sorted.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+      return sorted.sort(
+        (a, b) => prioritySortKey(a.priority) - prioritySortKey(b.priority)
+      );
     case 'created':
       return sorted.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
     default:

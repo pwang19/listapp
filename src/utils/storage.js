@@ -77,6 +77,7 @@ const DEFAULT_SETTINGS = {
   viewMode: 'grid',
   lastUsedListId: '',
   kanbanGroupBy: 'status',
+  priorityScaleVersion: 1,
 };
 
 export function loadSettings() {
@@ -146,7 +147,7 @@ export function needsBackupReminder(settings) {
 
 export function downloadBackup(lists, archived, customTags) {
   const payload = {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     lists,
     archived,

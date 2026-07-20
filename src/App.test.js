@@ -62,7 +62,8 @@ test('normalizeLists rejects non-arrays and assigns ids', () => {
 
 test('import modal shows error for invalid JSON', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /Import\/Export/i }));
+  fireEvent.click(screen.getByRole('button', { name: /More actions/i }));
+  fireEvent.click(screen.getByRole('menuitem', { name: /Import\/Export/i }));
 
   const dialog = screen.getByRole('dialog');
   const textarea = within(dialog).getByLabelText(/JSON Data/i);

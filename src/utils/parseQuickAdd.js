@@ -3,7 +3,7 @@ const TAG_RE = /#([a-zA-Z0-9_-]+)/g;
 const PRIORITY_RE = /!(p?[123]|high|medium|low)\b/i;
 const DUE_RE = /!(\d{4}-\d{2}-\d{2})\b/;
 
-const PRIORITY_MAP = { p1: 1, p2: 2, p3: 3, low: 1, medium: 2, high: 3, 1: 1, 2: 2, 3: 3 };
+const PRIORITY_MAP = { p1: 1, p2: 2, p3: 3, high: 1, medium: 2, low: 3, 1: 1, 2: 2, 3: 3 };
 
 export function parseQuickAdd(input) {
   let text = input.trim();

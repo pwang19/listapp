@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   DndContext,
@@ -17,7 +17,8 @@ import {
 import EditableText from './EditableText';
 import ListItemDisplay from './ListItemDisplay';
 import ListItemModal from './ListItemModal';
-import { LIST_COLORS, LIST_ICONS, SORT_MODES } from '../utils/constants';
+import ListCustomizePopover from './ListCustomizePopover';
+import { LIST_COLORS } from '../utils/constants';
 import { filterItems, hasActiveFilters } from '../utils/filterItems';
 import { sortItems } from '../utils/sortItems';
 import { listToMarkdown } from '../utils/helpers';
@@ -83,6 +84,8 @@ function List({
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const iconButtonRef = useRef(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -139,6 +142,8 @@ function List({
     onShare?.('Markdown copied to clipboard.');
   };
 
+  const closeMenu = () => setMenuOpen(false);
+
   return (
     <ListDropZone listId={listId}>
       <article
@@ -150,47 +155,49 @@ function List({
           <button
             type="button"
             className="icon-button"
-            onClick={() => onSetListMeta({ pinned: !pinned })}
-            aria-label={pinned ? 'Unpin list' : 'Pin list'}
-            title={pinned ? 'Unpin' : 'Pin'}
-          >
-            {pinned ? '📌' : '📍'}
-          </button>
-          <button
-            type="button"
-            className="icon-button"
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="List menu"
             aria-expanded={menuOpen}
+            aria-haspopup="menu"
           >
             ⋯
-          </button>
-          <button
-            type="button"
-            className="icon-button list-card-delete"
-            onClick={onDelete}
-            aria-label={`Delete list ${name}`}
-          >
-            ×
           </button>
         </div>
 
         {menuOpen ? (
           <div className="list-menu" role="menu">
-            <button type="button" role="menuitem" onClick={() => { onDuplicate(); setMenuOpen(false); }}>
+            <button type="button" role="menuitem" onClick={() => { onDuplicate(); closeMenu(); }}>
               Duplicate list
             </button>
-            <button type="button" role="menuitem" onClick={() => { onSaveAsTemplate(); setMenuOpen(false); }}>
+            <button type="button" role="menuitem" onClick={() => { onSaveAsTemplate(); closeMenu(); }}>
               Save as template
             </button>
-            <button type="button" role="menuitem" onClick={() => { onFocusMode?.(); setMenuOpen(false); }}>
+            <button type="button" role="menuitem" onClick={() => { onFocusMode?.(); closeMenu(); }}>
               Focus this list
             </button>
-            <button type="button" role="menuitem" onClick={() => { handleShare(); setMenuOpen(false); }}>
+            <button type="button" role="menuitem" onClick={() => { handleShare(); closeMenu(); }}>
               Copy share link
             </button>
-            <button type="button" role="menuitem" onClick={() => { handleExportMd(); setMenuOpen(false); }}>
+            <button type="button" role="menuitem" onClick={() => { handleExportMd(); closeMenu(); }}>
               Copy as Markdown
+            </button>
+            <div className="list-menu-separator" role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { onSetListMeta({ pinned: !pinned }); closeMenu(); }}
+              aria-label={pinned ? 'Unpin list' : 'Pin list'}
+            >
+              {pinned ? '✓ Pinned' : 'Pin list'}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="list-menu-item--danger"
+              onClick={() => { onDelete(); closeMenu(); }}
+              aria-label={`Delete list ${name}`}
+            >
+              Delete list
             </button>
           </div>
         ) : null}
@@ -206,7 +213,17 @@ function List({
             {collapsed ? '▸' : '▾'}
           </button>
           <div className="list-card-header">
-            <span className="list-icon" aria-hidden="true">{icon}</span>
+            <button
+              ref={iconButtonRef}
+              type="button"
+              className="list-icon-btn"
+              onClick={() => setCustomizeOpen((v) => !v)}
+              aria-label="Customize list appearance and sort"
+              aria-expanded={customizeOpen}
+              title="Customize list"
+            >
+              <span className="list-icon" aria-hidden="true">{icon}</span>
+            </button>
             <h2 className="list-card-title">
               <EditableText value={name} onSave={onNameChange} className="list-title" />
             </h2>
@@ -216,41 +233,20 @@ function List({
           </div>
         </div>
 
+        {customizeOpen ? (
+          <ListCustomizePopover
+            icon={icon}
+            color={color}
+            sortMode={sortMode}
+            onSetListStyle={onSetListStyle}
+            onSetListMeta={onSetListMeta}
+            onClose={() => setCustomizeOpen(false)}
+            anchorRef={iconButtonRef}
+          />
+        ) : null}
+
         {!collapsed ? (
           <>
-            <div className="list-style-row">
-              <select
-                className="style-select"
-                value={icon}
-                onChange={(e) => onSetListStyle({ icon: e.target.value })}
-                aria-label="List icon"
-              >
-                {LIST_ICONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-              <select
-                className="style-select"
-                value={color}
-                onChange={(e) => onSetListStyle({ color: e.target.value })}
-                aria-label="List color"
-              >
-                {LIST_COLORS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
-                ))}
-              </select>
-              <select
-                className="style-select"
-                value={sortMode}
-                onChange={(e) => onSetListMeta({ sortMode: e.target.value })}
-                aria-label="Sort items"
-              >
-                {SORT_MODES.map((opt) => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-
             {filtersActive && sortMode === 'manual' ? (
               <p className="empty-hint reorder-hint">Reordering disabled while filters are active.</p>
             ) : null}
@@ -311,13 +307,15 @@ function List({
                 className="text-input"
                 data-list-add-item={listId}
               />
-              <button
-                type="button"
-                className="btn btn-danger btn-block"
-                onClick={onDeleteCompletedItems}
-              >
-                Archive completed
-              </button>
+              {completedCount > 0 ? (
+                <button
+                  type="button"
+                  className="btn-link list-archive-link"
+                  onClick={onDeleteCompletedItems}
+                >
+                  Archive {completedCount} completed
+                </button>
+              ) : null}
             </div>
           </>
         ) : null}

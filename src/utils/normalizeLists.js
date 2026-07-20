@@ -6,6 +6,30 @@ const validColorIds = new Set(LIST_COLORS.map((c) => c.id));
 const validIcons = new Set(LIST_ICONS);
 const validRecurring = new Set(RECURRING_OPTIONS.map((r) => r.id));
 
+export function migrateLegacyPriority(priority) {
+  if (!priority) return 0;
+  return 4 - priority;
+}
+
+export function migrateListsPriorities(lists = []) {
+  return lists.map((list) => ({
+    ...list,
+    items: Array.isArray(list.items)
+      ? list.items.map((item) => ({
+          ...item,
+          priority: migrateLegacyPriority(item.priority),
+        }))
+      : [],
+  }));
+}
+
+export function migrateArchivedPriorities(entries = []) {
+  return entries.map((entry) => ({
+    ...entry,
+    priority: migrateLegacyPriority(entry.priority),
+  }));
+}
+
 export function normalizeSubItem(subItem = {}) {
   return {
     id: subItem.id || createId(),
@@ -80,16 +104,21 @@ export function normalizeArchivedEntry(entry = {}, customTags = []) {
   };
 }
 
-export function normalizeLists(data, customTags = []) {
+export function normalizeLists(data, customTags = [], { migrateLegacyPriorities = false } = {}) {
   if (!Array.isArray(data)) {
     return { ok: false, error: 'Imported data must be a JSON array of lists.' };
   }
-  return { ok: true, lists: data.map((l) => normalizeList(l, customTags)) };
+  const lists = data.map((l) => normalizeList(l, customTags));
+  return {
+    ok: true,
+    lists: migrateLegacyPriorities ? migrateListsPriorities(lists) : lists,
+  };
 }
 
-export function normalizeArchived(data, customTags = []) {
+export function normalizeArchived(data, customTags = [], { migrateLegacyPriorities = false } = {}) {
   if (!Array.isArray(data)) return [];
-  return data.map((e) => normalizeArchivedEntry(e, customTags));
+  const entries = data.map((e) => normalizeArchivedEntry(e, customTags));
+  return migrateLegacyPriorities ? migrateArchivedPriorities(entries) : entries;
 }
 
 export function normalizeCustomTag(tag = {}) {

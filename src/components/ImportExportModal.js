@@ -28,8 +28,8 @@ function ImportExportModal({
     }
   }, [isOpen, jsonData]);
 
-  const applyImport = (parsed, mode) => {
-    const result = onImport(parsed, mode);
+  const applyImport = (parsed, mode, migrateLegacyPriorities = false) => {
+    const result = onImport(parsed, mode, { migrateLegacyPriorities });
     if (!result || !result.ok) {
       setError((result && result.error) || 'Import failed.');
       return false;
@@ -50,11 +50,18 @@ function ImportExportModal({
       setError('Invalid JSON format. Check your JSON and try again.');
       return null;
     }
-    if (!Array.isArray(parsed)) {
+    let lists;
+    let migrateLegacyPriorities = true;
+    if (Array.isArray(parsed)) {
+      lists = parsed;
+    } else if (Array.isArray(parsed.lists)) {
+      lists = parsed.lists;
+      migrateLegacyPriorities = (parsed.version || 1) < 3;
+    } else {
       setError('Imported data must be a JSON array of lists.');
       return null;
     }
-    return parsed;
+    return { lists, migrateLegacyPriorities };
   };
 
   const handleReplaceClick = () => {
@@ -65,7 +72,7 @@ function ImportExportModal({
       setConfirmMode('replace');
       return;
     }
-    applyImport(parsed, 'replace');
+    applyImport(parsed.lists, 'replace', parsed.migrateLegacyPriorities);
   };
 
   const handleMergeClick = () => {
@@ -76,14 +83,18 @@ function ImportExportModal({
       setConfirmMode('merge');
       return;
     }
-    applyImport(parsed, 'replace');
+    applyImport(parsed.lists, 'replace', parsed.migrateLegacyPriorities);
   };
 
   const handleConfirm = () => {
     const mode = confirmMode;
     setConfirmMode(null);
     if (pendingImport) {
-      applyImport(pendingImport, mode);
+      applyImport(
+        pendingImport.lists,
+        mode,
+        pendingImport.migrateLegacyPriorities
+      );
     }
     setPendingImport(null);
   };
@@ -128,9 +139,19 @@ function ImportExportModal({
     reader.onload = () => {
       try {
         const parsed = JSON.parse(reader.result);
-        const data = parsed.lists || parsed;
-        setJsonText(JSON.stringify(data, null, 2));
-        setStatus(`Loaded ${file.name}`);
+        if (Array.isArray(parsed)) {
+          setJsonText(JSON.stringify(parsed, null, 2));
+          setStatus(`Loaded ${file.name}`);
+        } else if (Array.isArray(parsed.lists)) {
+          setJsonText(JSON.stringify(parsed, null, 2));
+          const migrateLegacyPriorities = (parsed.version || 1) < 3;
+          setStatus(
+            `Loaded ${file.name}${migrateLegacyPriorities ? ' (legacy priorities will be converted)' : ''}`
+          );
+        } else {
+          setError('Invalid JSON file.');
+          return;
+        }
         setError('');
       } catch {
         setError('Invalid JSON file.');

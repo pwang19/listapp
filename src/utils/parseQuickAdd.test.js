@@ -10,6 +10,13 @@ describe('parseQuickAdd', () => {
     expect(result.priority).toBe(2);
   });
 
+  test('maps P1 to high and P3 to low', () => {
+    expect(parseQuickAdd('Urgent !p1').priority).toBe(1);
+    expect(parseQuickAdd('Later !p3').priority).toBe(3);
+    expect(parseQuickAdd('Now !high').priority).toBe(1);
+    expect(parseQuickAdd('Whenever !low').priority).toBe(3);
+  });
+
   test('returns plain text when no markers', () => {
     expect(parseQuickAdd('Simple task').text).toBe('Simple task');
   });

@@ -24,7 +24,7 @@ import {
 } from '../utils/normalizeLists';
 import { mergeLists } from '../utils/mergeLists';
 import { reorderArray } from '../utils/helpers';
-import { MAX_UNDO } from '../utils/constants';
+import { MAX_UNDO, PRIORITY_SCALE_VERSION } from '../utils/constants';
 import { TEMPLATES } from '../utils/templates';
 import { cloneList, cloneItem } from '../utils/clone';
 import { parseQuickAdd } from '../utils/parseQuickAdd';
@@ -222,12 +222,16 @@ function getInitialLists() {
   const stored = loadLists();
   if (!stored) return [];
   const customTags = loadCustomTags();
-  const result = normalizeLists(stored, customTags);
+  const settings = loadSettings();
+  const migrateLegacyPriorities = (settings.priorityScaleVersion || 1) < PRIORITY_SCALE_VERSION;
+  const result = normalizeLists(stored, customTags, { migrateLegacyPriorities });
   return result.ok ? result.lists : [];
 }
 
 function getInitialArchived() {
-  return normalizeArchived(loadArchived(), loadCustomTags());
+  const settings = loadSettings();
+  const migrateLegacyPriorities = (settings.priorityScaleVersion || 1) < PRIORITY_SCALE_VERSION;
+  return normalizeArchived(loadArchived(), loadCustomTags(), { migrateLegacyPriorities });
 }
 
 export function useLists() {
@@ -262,6 +266,12 @@ export function useLists() {
   useEffect(() => { saveCustomTags(customTags); }, [customTags]);
   useEffect(() => { saveUserTemplates(userTemplates); }, [userTemplates]);
   useEffect(() => { saveSettings(settings); }, [settings]);
+
+  useEffect(() => {
+    const stored = loadSettings();
+    if ((stored.priorityScaleVersion || 1) >= PRIORITY_SCALE_VERSION) return;
+    setSettings((prev) => ({ ...prev, priorityScaleVersion: PRIORITY_SCALE_VERSION }));
+  }, []);
 
   const clearUndoTimer = useCallback(() => {
     if (undoTimerRef.current) {
@@ -737,16 +747,19 @@ export function useLists() {
   );
 
   const importLists = useCallback(
-    (data, mode = 'replace') => {
+    (data, mode = 'replace', { migrateLegacyPriorities = false } = {}) => {
+      const incoming = migrateLegacyPriorities
+        ? normalizeLists(data, customTagsRef.current, { migrateLegacyPriorities: true }).lists
+        : data;
       if (mode === 'merge') {
-        const result = mergeLists(listsRef.current, data);
+        const result = mergeLists(listsRef.current, incoming);
         if (!result.ok) return result;
         withUndo('Lists merged', () => {
           dispatch({ type: 'SET_LISTS', lists: result.lists });
         });
         return result;
       }
-      const result = normalizeLists(data, customTagsRef.current);
+      const result = normalizeLists(incoming, customTagsRef.current);
       if (!result.ok) return result;
       withUndo('Lists imported', () => {
         dispatch({ type: 'SET_LISTS', lists: result.lists });

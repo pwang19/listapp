@@ -20,10 +20,12 @@ export const TAG_PALETTE = [
 
 export const PRIORITIES = [
   { id: 0, label: 'None', color: '#94a3b8' },
-  { id: 1, label: 'Low', color: '#64748b' },
+  { id: 1, label: 'High', color: '#e11d48' },
   { id: 2, label: 'Medium', color: '#d97706' },
-  { id: 3, label: 'High', color: '#e11d48' },
+  { id: 3, label: 'Low', color: '#64748b' },
 ];
+
+export const PRIORITY_SCALE_VERSION = 2;
 
 export const RECURRING_OPTIONS = [
   { id: 'none', label: 'None' },

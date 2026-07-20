@@ -66,6 +66,7 @@ function ListItemModal({
   const dueId = useId();
   const subInputId = useId();
   const saveTimerRef = useRef(null);
+  const wasOpenRef = useRef(false);
 
   const allTags = getAllTags(customTags);
 
@@ -75,7 +76,7 @@ function ListItemModal({
   );
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setDescriptionValue(description || '');
       setDueDateValue(dueDate || '');
       setTagsValue(tags || []);
@@ -87,6 +88,7 @@ function ListItemModal({
       setNewTagInput('');
       setSavedHint(false);
     }
+    wasOpenRef.current = isOpen;
   }, [isOpen, description, dueDate, tags, priority, recurring]);
 
   const autoSave = useCallback(

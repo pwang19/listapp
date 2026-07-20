@@ -27,6 +27,7 @@ import KanbanView from './KanbanView';
 import CommandPalette from './CommandPalette';
 import BulkActionBar from './BulkActionBar';
 import LiveRegion from './LiveRegion';
+import ToolbarMoreMenu from './ToolbarMoreMenu';
 import { useLists } from '../hooks/useLists';
 import { getAllTags } from '../utils/tags';
 import { listMatchesFilters, hasActiveFilters } from '../utils/filterItems';
@@ -191,8 +192,15 @@ function Main() {
         reader.onload = () => {
           try {
             const parsed = JSON.parse(reader.result);
-            const data = parsed.lists || parsed;
-            importLists(data, 'merge');
+            const data = Array.isArray(parsed) ? parsed : parsed.lists;
+            const migrateLegacyPriorities = Array.isArray(parsed)
+              ? true
+              : (parsed.version || 1) < 3;
+            if (!Array.isArray(data)) {
+              announce('Invalid JSON file');
+              return;
+            }
+            importLists(data, 'merge', { migrateLegacyPriorities });
             announce('File imported');
           } catch {
             announce('Invalid JSON file');
@@ -565,29 +573,29 @@ function Main() {
             </button>
           ))}
         </div>
-        <button type="button" className="btn btn-secondary" onClick={() => setTemplatesOpen(true)}>Templates</button>
-        <button type="button" className="btn btn-secondary" onClick={() => setArchiveOpen(true)}>
-          Archived ({archived.length})
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => setPrintOpen(true)}>Print / Share</button>
-        <button type="button" className="btn btn-secondary" onClick={() => setBulkMode((v) => !v)}>
-          {bulkMode ? 'Exit bulk' : 'Bulk select'}
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => updateSettings({ darkMode: settings.darkMode === 'dark' ? 'light' : 'dark' })}
-          aria-label="Toggle dark mode"
-        >
-          {settings.darkMode === 'dark' ? '☀️' : '🌙'}
-        </button>
-        <button type="button" className="btn btn-primary" onClick={() => setImportExportModalOpen(true)}>
-          Import/Export
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => setCommandOpen(true)} title="Cmd+K">
-          ⌘K
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => setHelpOpen(true)} aria-label="Keyboard shortcuts">?</button>
+        <div className="toolbar-actions-end">
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon"
+            onClick={() => updateSettings({ darkMode: settings.darkMode === 'dark' ? 'light' : 'dark' })}
+            aria-label="Toggle dark mode"
+          >
+            {settings.darkMode === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <ToolbarMoreMenu
+            archivedCount={archived.length}
+            bulkMode={bulkMode}
+            onTemplates={() => setTemplatesOpen(true)}
+            onArchive={() => setArchiveOpen(true)}
+            onPrintShare={() => setPrintOpen(true)}
+            onToggleBulk={() => setBulkMode((v) => !v)}
+            onImportExport={() => setImportExportModalOpen(true)}
+            onHelp={() => setHelpOpen(true)}
+          />
+          <button type="button" className="btn btn-secondary btn-icon" onClick={() => setCommandOpen(true)} title="Cmd+K" aria-label="Command palette">
+            ⌘K
+          </button>
+        </div>
       </div>
 
       <BulkActionBar
