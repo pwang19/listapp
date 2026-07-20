@@ -47,12 +47,17 @@
 .main {
   width: 100%;
   max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
 }
 
 .lists-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 1.5rem;
+  align-items: start;
   margin-bottom: 2rem;
   width: 100%;
 }
@@ -71,6 +76,10 @@
   flex-direction: column;
   align-items: center;
   gap: 1rem;
+  position: relative;
+  z-index: 1;
+  margin-top: 0.5rem;
+  padding-bottom: 1rem;
 }
 
 .list-card {
@@ -79,9 +88,11 @@
   padding: 1.5rem;
   background-color: var(--bg-card);
   color: var(--text-primary);
-  min-height: 400px;
+  min-height: 0;
   position: relative;
   box-shadow: var(--shadow);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .list-card-title {
@@ -101,7 +112,7 @@
   list-style: none;
   padding: 0;
   margin: 0 0 1rem;
-  min-height: 160px;
+  min-height: 0;
 }
 
 .list-items li {
@@ -109,7 +120,8 @@
 }
 
 .list-empty-hint {
-  min-height: 160px;
+  min-height: 0;
+  margin: 0.5rem 0 1rem;
   display: flex;
   align-items: flex-start;
 }
@@ -517,6 +529,9 @@ textarea:focus-visible {
   align-items: flex-start;
   gap: 0.35rem;
   width: 100%;
+  max-width: 100%;
+  position: relative;
+  box-sizing: border-box;
 }
 
 .sortable-row-body {
@@ -525,15 +540,22 @@ textarea:focus-visible {
 }
 
 .list-sortable {
-  height: 100%;
+  min-width: 0;
+  width: 100%;
+  height: auto;
+  align-self: start;
 }
 
 .list-sortable .sortable-row-body {
-  height: 100%;
+  height: auto;
 }
 
 .list-sortable .list-card {
-  height: 100%;
+  height: auto;
+}
+
+.list-sortable.is-dragging {
+  z-index: 5;
 }
 
 .drag-handle {
@@ -780,4 +802,475 @@ textarea:focus-visible {
   .toolbar--actions .btn {
     flex: 1 1 auto;
   }
+}
+
+/* --- New features --- */
+
+[data-theme='dark'] {
+  --bg-page: #0f1419;
+  --bg-page-accent: #1a2332;
+  --bg-card: #1e293b;
+  --bg-panel: #1e293b;
+  --text-on-dark: #e2e8f0;
+  --text-primary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --border: #334155;
+}
+
+[data-theme='dark'] .text-input,
+[data-theme='dark'] .description-textarea,
+[data-theme='dark'] .style-select {
+  background: #0f172a;
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+[data-theme='dark'] .chip-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.alert--error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.alert--warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+[data-theme='dark'] .alert--error {
+  background: #450a0a;
+  color: #fecaca;
+}
+
+[data-theme='dark'] .alert--warn {
+  background: #451a03;
+  color: #fde68a;
+}
+
+.view-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.25rem;
+  border-radius: 999px;
+  margin-right: auto;
+}
+
+.empty-state-block {
+  text-align: center;
+  margin: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.toolbar-clear {
+  color: var(--text-on-dark);
+}
+
+.list-card-top-actions {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  display: flex;
+  gap: 0.15rem;
+}
+
+.list-card-delete {
+  position: static;
+}
+
+.list-collapse-btn {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.35rem;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.list-card-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  margin-right: 4rem;
+}
+
+.list-progress {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.list-card.is-pinned {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow);
+}
+
+.list-card.is-collapsed .list-card-actions,
+.list-card.is-collapsed .list-style-row,
+.list-card.is-collapsed .list-items {
+  display: none;
+}
+
+.list-menu {
+  position: absolute;
+  top: 2.5rem;
+  right: 0.85rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+}
+
+.list-menu button {
+  background: none;
+  border: none;
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.list-menu button:hover {
+  background: rgba(47, 111, 237, 0.1);
+}
+
+.list-drop-zone.is-over {
+  outline: 2px dashed var(--accent);
+  border-radius: var(--radius);
+}
+
+.priority-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.reorder-hint {
+  margin: 0 0 0.5rem;
+}
+
+.subitems-toggle {
+  margin: 0.25rem 0 0 1.75rem;
+  font-size: 0.8rem;
+}
+
+.text-input--sm {
+  margin-top: 0.35rem;
+  margin-left: 1.75rem;
+  width: calc(100% - 1.75rem);
+  padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.tag-create-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.autosave-hint {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  font-size: 0.75rem;
+  color: var(--success);
+  font-weight: 600;
+}
+
+.completed-at-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: -0.5rem 0 1rem;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.bulk-bar-count {
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.upcoming-view {
+  margin-bottom: 2rem;
+}
+
+.upcoming-group {
+  margin-bottom: 1.5rem;
+}
+
+.upcoming-group-title {
+  color: var(--text-on-dark);
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.upcoming-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.upcoming-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.upcoming-list-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 120px;
+}
+
+.upcoming-item-text {
+  flex: 1;
+  font-weight: 600;
+}
+
+.all-items-view {
+  overflow-x: auto;
+  margin-bottom: 2rem;
+}
+
+.all-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-card);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.all-items-table th,
+.all-items-table td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.all-items-table th {
+  background: rgba(0, 0, 0, 0.04);
+  font-weight: 700;
+}
+
+.all-items-table tr.is-complete td {
+  opacity: 0.6;
+}
+
+.all-items-list {
+  border-left: 3px solid;
+  padding-left: 0.5rem;
+}
+
+.tag-row--inline {
+  margin: 0;
+}
+
+.kanban-board {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+  margin-bottom: 2rem;
+}
+
+.kanban-column {
+  flex: 0 0 260px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.kanban-column-title {
+  color: var(--text-on-dark);
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.kanban-count {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.kanban-cards {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kanban-card {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kanban-card.is-complete {
+  opacity: 0.65;
+}
+
+.kanban-card-list {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.kanban-card-text {
+  font-weight: 600;
+}
+
+.kanban-controls {
+  margin-bottom: 1rem;
+  color: var(--text-on-dark);
+}
+
+.kanban-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.command-palette-input {
+  margin-bottom: 0.75rem;
+}
+
+.command-palette-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.command-palette-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+
+.command-palette-item.is-highlighted,
+.command-palette-item:hover {
+  background: rgba(47, 111, 237, 0.12);
+}
+
+.command-palette-item kbd {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: #f3f4f6;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.command-palette-empty {
+  padding: 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.file-import-btn {
+  margin-bottom: 0.5rem;
+}
+
+.lists-grid--focus {
+  grid-template-columns: 1fr;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.focus-exit {
+  margin-bottom: 1rem;
+}
+
+.drag-overlay-hint {
+  padding: 0.5rem 1rem;
+  background: var(--bg-panel);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+}
+
+.swipe-item {
+  transition: transform 0.1s ease-out;
 }

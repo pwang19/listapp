@@ -9,13 +9,19 @@ function SortableRow({ id, children, className = '', handle = true }) {
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    // Only animate while dragging — avoids sticky transforms overlapping
+    // siblings/controls after layout changes.
+    transition: isDragging ? transition : undefined,
     opacity: isDragging ? 0.7 : 1,
+    zIndex: isDragging ? 5 : undefined,
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={`sortable-row ${className}`.trim()}>
-      {handle ? (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`sortable-row ${className}${isDragging ? ' is-dragging' : ''}`.trim()}
+    >      {handle ? (
         <button
           type="button"
           className="drag-handle"

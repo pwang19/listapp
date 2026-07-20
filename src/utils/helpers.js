@@ -140,3 +140,73 @@ export function reorderArray(items, activeId, overId) {
   next.splice(newIndex, 0, moved);
   return next;
 }
+
+export function listToMarkdown(list) {
+  const parts = [`## ${list.icon || '📋'} ${list.name}`, ''];
+  if (!list.items.length) {
+    parts.push('_Empty list._');
+    return parts.join('\n');
+  }
+  list.items.forEach((item) => {
+    const box = item.complete ? 'x' : ' ';
+    const due = item.dueDate ? ` _(due ${item.dueDate})_` : '';
+    const tags = item.tags?.length ? ` \`${item.tags.join(', ')}\`` : '';
+    const pri = item.priority ? ` !p${item.priority}` : '';
+    parts.push(`- [${box}] ${item.text}${due}${tags}${pri}`);
+    if (item.description) {
+      item.description.split('\n').forEach((line) => {
+        parts.push(`  > ${line}`);
+      });
+    }
+    (item.subItems || []).forEach((sub) => {
+      const subBox = sub.complete ? 'x' : ' ';
+      parts.push(`  - [${subBox}] ${sub.text}`);
+    });
+  });
+  return parts.join('\n');
+}
+
+export function getUpcomingItems(lists, { daysAhead = 7 } = {}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(today);
+  end.setDate(end.getDate() + daysAhead);
+  const results = [];
+  lists.forEach((list) => {
+    list.items.forEach((item) => {
+      if (!item.dueDate || item.complete) return;
+      const due = new Date(`${item.dueDate}T00:00:00`);
+      if (due <= end) {
+        results.push({
+          listId: list.id,
+          listName: list.name,
+          listIcon: list.icon,
+          item,
+          overdue: isOverdue(item.dueDate, false),
+          dueSoon: isDueSoon(item.dueDate, false),
+        });
+      }
+    });
+  });
+  return results.sort((a, b) => a.item.dueDate.localeCompare(b.item.dueDate));
+}
+
+export function flattenAllItems(lists) {
+  const rows = [];
+  lists.forEach((list) => {
+    list.items.forEach((item) => {
+      rows.push({
+        listId: list.id,
+        listName: list.name,
+        listColor: list.color,
+        listIcon: list.icon,
+        item,
+      });
+    });
+  });
+  return rows;
+}
+
+export function isListFullyComplete(list) {
+  return list.items.length > 0 && list.items.every((i) => i.complete);
+}

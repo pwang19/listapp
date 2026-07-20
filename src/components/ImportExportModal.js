@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import Modal from './Modal';
 import ConfirmModal from './ConfirmModal';
@@ -9,12 +9,14 @@ function ImportExportModal({
   onClose,
   onImport,
   hasExistingLists,
+  onBackup,
 }) {
   const [jsonText, setJsonText] = useState('');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [confirmMode, setConfirmMode] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -119,6 +121,25 @@ function ImportExportModal({
     }
   };
 
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const data = parsed.lists || parsed;
+        setJsonText(JSON.stringify(data, null, 2));
+        setStatus(`Loaded ${file.name}`);
+        setError('');
+      } catch {
+        setError('Invalid JSON file.');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
   const handleClose = () => {
     if (confirmMode) return;
     onClose();
@@ -143,6 +164,21 @@ function ImportExportModal({
 
         <div className="field">
           <label htmlFor="import-export-json">JSON Data</label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            onChange={handleFileChange}
+            aria-label="Import JSON file"
+          />
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm file-import-btn"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Choose file…
+          </button>
           <textarea
             id="import-export-json"
             value={jsonText}
@@ -175,6 +211,11 @@ function ImportExportModal({
           <button type="button" className="btn btn-secondary" onClick={handleDownload}>
             Download
           </button>
+          {onBackup ? (
+            <button type="button" className="btn btn-secondary" onClick={onBackup}>
+              Full backup
+            </button>
+          ) : null}
           <div className="button-row-spacer" />
           <button type="button" className="btn btn-secondary" onClick={handleClose}>
             Cancel
@@ -212,6 +253,7 @@ ImportExportModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   onImport: PropTypes.func.isRequired,
   hasExistingLists: PropTypes.bool,
+  onBackup: PropTypes.func,
 };
 
 export default ImportExportModal;

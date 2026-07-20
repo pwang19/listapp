@@ -5,6 +5,14 @@ import {
   saveLists,
   loadArchived,
   saveArchived,
+  loadSettings,
+  saveSettings,
+  loadCustomTags,
+  saveCustomTags,
+  loadUserTemplates,
+  saveUserTemplates,
+  downloadBackup,
+  needsBackupReminder,
 } from '../utils/storage';
 import {
   normalizeLists,
@@ -12,11 +20,17 @@ import {
   normalizeSubItem,
   normalizeList,
   normalizeArchived,
+  normalizeCustomTag,
 } from '../utils/normalizeLists';
 import { mergeLists } from '../utils/mergeLists';
 import { reorderArray } from '../utils/helpers';
 import { MAX_UNDO } from '../utils/constants';
 import { TEMPLATES } from '../utils/templates';
+import { cloneList, cloneItem } from '../utils/clone';
+import { parseQuickAdd } from '../utils/parseQuickAdd';
+import { createCustomTag } from '../utils/tags';
+import { applyRecurringOnComplete } from '../utils/recurring';
+import { launchConfetti } from '../utils/confetti';
 
 function updateList(lists, listId, updater) {
   return lists.map((list) => (list.id === listId ? updater(list) : list));
@@ -41,8 +55,13 @@ function listsReducer(state, action) {
           items: [],
           color: action.color,
           icon: action.icon,
-        }),
+        }, action.customTags),
       ];
+    case 'DUPLICATE_LIST': {
+      const source = state.find((l) => l.id === action.listId);
+      if (!source) return state;
+      return [...state, cloneList(source, { resetComplete: action.resetComplete })];
+    }
     case 'RENAME_LIST':
       return updateList(state, action.listId, (list) => ({ ...list, name: action.name }));
     case 'SET_LIST_STYLE':
@@ -50,6 +69,11 @@ function listsReducer(state, action) {
         ...list,
         color: action.color ?? list.color,
         icon: action.icon ?? list.icon,
+      }));
+    case 'SET_LIST_META':
+      return updateList(state, action.listId, (list) => ({
+        ...list,
+        ...action.patch,
       }));
     case 'DELETE_LIST':
       return state.filter((list) => list.id !== action.listId);
@@ -64,45 +88,88 @@ function listsReducer(state, action) {
             text: action.text,
             complete: false,
             description: '',
-            dueDate: '',
-            tags: [],
+            dueDate: action.dueDate || '',
+            tags: action.tags || [],
+            priority: action.priority || 0,
             subItems: [],
-          }),
+          }, action.customTags),
         ],
       }));
+    case 'DUPLICATE_ITEM': {
+      const list = state.find((l) => l.id === action.listId);
+      const item = list?.items.find((i) => i.id === action.itemId);
+      if (!item) return state;
+      return updateList(state, action.listId, (l) => ({
+        ...l,
+        items: [...l.items, cloneItem(item)],
+      }));
+    }
+    case 'MOVE_ITEM': {
+      const fromList = state.find((l) => l.id === action.fromListId);
+      const item = fromList?.items.find((i) => i.id === action.itemId);
+      if (!item || !state.some((l) => l.id === action.toListId)) return state;
+      return updateList(
+        updateList(state, action.fromListId, (l) => ({
+          ...l,
+          items: l.items.filter((i) => i.id !== action.itemId),
+        })),
+        action.toListId,
+        (l) => ({ ...l, items: [...l.items, normalizeItem(item)] })
+      );
+    }
+    case 'BULK_UPDATE_ITEMS':
+      return state.map((list) => {
+        if (list.id !== action.listId) return list;
+        return {
+          ...list,
+          items: list.items.map((item) =>
+            action.itemIds.includes(item.id)
+              ? normalizeItem({ ...item, ...action.patch }, action.customTags)
+              : item
+          ),
+        };
+      });
+    case 'BULK_MOVE_ITEMS': {
+      const fromList = state.find((l) => l.id === action.fromListId);
+      if (!fromList || !state.some((l) => l.id === action.toListId)) return state;
+      const moving = fromList.items.filter((i) => action.itemIds.includes(i.id));
+      return updateList(
+        updateList(state, action.fromListId, (l) => ({
+          ...l,
+          items: l.items.filter((i) => !action.itemIds.includes(i.id)),
+        })),
+        action.toListId,
+        (l) => ({ ...l, items: [...l.items, ...moving.map((i) => normalizeItem(i))] })
+      );
+    }
+    case 'BULK_ARCHIVE_ITEMS': {
+      return updateList(state, action.listId, (list) => ({
+        ...list,
+        items: list.items.filter((i) => !action.itemIds.includes(i.id)),
+      }));
+    }
     case 'RESTORE_ITEM':
       return updateList(state, action.listId, (list) => ({
         ...list,
-        items: [...list.items, normalizeItem(action.item)],
+        items: [...list.items, normalizeItem(action.item, action.customTags)],
       }));
     case 'TOGGLE_ITEM':
-      return updateItem(state, action.listId, action.itemId, (item) => ({
-        ...item,
-        complete: !item.complete,
-      }));
+      return updateItem(state, action.listId, action.itemId, (item) => {
+        const next = { ...item, complete: !item.complete };
+        if (next.complete) {
+          next.completedAt = new Date().toISOString();
+          return applyRecurringOnComplete(next);
+        }
+        return { ...next, completedAt: '' };
+      });
     case 'RENAME_ITEM':
       return updateItem(state, action.listId, action.itemId, (item) => ({
         ...item,
         text: action.name,
       }));
-    case 'SET_ITEM_DESCRIPTION':
-      return updateItem(state, action.listId, action.itemId, (item) => ({
-        ...item,
-        description: action.description,
-      }));
-    case 'SET_ITEM_DUE_DATE':
-      return updateItem(state, action.listId, action.itemId, (item) => ({
-        ...item,
-        dueDate: action.dueDate,
-      }));
-    case 'SET_ITEM_TAGS':
-      return updateItem(state, action.listId, action.itemId, (item) => ({
-        ...item,
-        tags: action.tags,
-      }));
     case 'UPDATE_ITEM':
       return updateItem(state, action.listId, action.itemId, (item) =>
-        normalizeItem({ ...item, ...action.patch })
+        normalizeItem({ ...item, ...action.patch }, action.customTags)
       );
     case 'ADD_SUB_ITEM':
       return updateItem(state, action.listId, action.itemId, (item) => ({
@@ -154,38 +221,47 @@ function listsReducer(state, action) {
 function getInitialLists() {
   const stored = loadLists();
   if (!stored) return [];
-  const result = normalizeLists(stored);
+  const customTags = loadCustomTags();
+  const result = normalizeLists(stored, customTags);
   return result.ok ? result.lists : [];
 }
 
 function getInitialArchived() {
-  return normalizeArchived(loadArchived());
+  return normalizeArchived(loadArchived(), loadCustomTags());
 }
 
 export function useLists() {
   const [lists, dispatch] = useReducer(listsReducer, undefined, getInitialLists);
   const [archived, setArchived] = useState(getInitialArchived);
+  const [customTags, setCustomTags] = useState(loadCustomTags);
+  const [userTemplates, setUserTemplates] = useState(loadUserTemplates);
+  const [settings, setSettings] = useState(loadSettings);
   const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
   const [toast, setToast] = useState(null);
+  const [storageError, setStorageError] = useState(null);
   const undoTimerRef = useRef(null);
   const listsRef = useRef(lists);
   const archivedRef = useRef(archived);
+  const customTagsRef = useRef(customTags);
+
+  useEffect(() => { listsRef.current = lists; }, [lists]);
+  useEffect(() => { archivedRef.current = archived; }, [archived]);
+  useEffect(() => { customTagsRef.current = customTags; }, [customTags]);
 
   useEffect(() => {
-    listsRef.current = lists;
+    const result = saveLists(lists);
+    if (!result.ok) setStorageError(result.error);
   }, [lists]);
 
   useEffect(() => {
-    archivedRef.current = archived;
+    const result = saveArchived(archived);
+    if (!result.ok) setStorageError(result.error);
   }, [archived]);
 
-  useEffect(() => {
-    saveLists(lists);
-  }, [lists]);
-
-  useEffect(() => {
-    saveArchived(archived);
-  }, [archived]);
+  useEffect(() => { saveCustomTags(customTags); }, [customTags]);
+  useEffect(() => { saveUserTemplates(userTemplates); }, [userTemplates]);
+  useEffect(() => { saveSettings(settings); }, [settings]);
 
   const clearUndoTimer = useCallback(() => {
     if (undoTimerRef.current) {
@@ -194,34 +270,34 @@ export function useLists() {
     }
   }, []);
 
+  const snapshot = useCallback(
+    () => ({
+      lists: listsRef.current,
+      archived: archivedRef.current,
+      customTags: customTagsRef.current,
+    }),
+    []
+  );
+
   const pushHistory = useCallback(
-    (message, snapshot) => {
+    (message, before) => {
       const entry = {
         id: createId(),
         message,
-        lists: snapshot.lists,
-        archived: snapshot.archived,
+        lists: before.lists,
+        archived: before.archived,
+        customTags: before.customTags,
       };
       setUndoStack((stack) => [entry, ...stack].slice(0, MAX_UNDO));
+      setRedoStack([]);
       clearUndoTimer();
       setToast({ id: entry.id, message });
       undoTimerRef.current = setTimeout(() => {
         setToast(null);
         undoTimerRef.current = null;
       }, 5000);
-      if (typeof undoTimerRef.current.unref === 'function') {
-        undoTimerRef.current.unref();
-      }
     },
     [clearUndoTimer]
-  );
-
-  const snapshot = useCallback(
-    () => ({
-      lists: listsRef.current,
-      archived: archivedRef.current,
-    }),
-    []
   );
 
   const dismissToast = useCallback(() => {
@@ -233,13 +309,44 @@ export function useLists() {
     setUndoStack((stack) => {
       if (!stack.length) return stack;
       const [latest, ...rest] = stack;
+      const current = snapshot();
+      setRedoStack((redo) => [{ ...latest, redoSnapshot: current }, ...redo].slice(0, MAX_UNDO));
       dispatch({ type: 'RESTORE_SNAPSHOT', lists: latest.lists });
       setArchived(latest.archived);
+      setCustomTags(latest.customTags || []);
       clearUndoTimer();
       setToast(null);
       return rest;
     });
-  }, [clearUndoTimer]);
+  }, [clearUndoTimer, snapshot]);
+
+  const applyRedo = useCallback(() => {
+    setRedoStack((stack) => {
+      if (!stack.length) return stack;
+      const [latest, ...rest] = stack;
+      const before = snapshot();
+      const entry = {
+        id: createId(),
+        message: 'Redo',
+        lists: before.lists,
+        archived: before.archived,
+        customTags: before.customTags,
+      };
+      setUndoStack((undo) => [entry, ...undo].slice(0, MAX_UNDO));
+      if (latest.redoSnapshot) {
+        dispatch({ type: 'RESTORE_SNAPSHOT', lists: latest.redoSnapshot.lists });
+        setArchived(latest.redoSnapshot.archived);
+        setCustomTags(latest.redoSnapshot.customTags || []);
+      } else {
+        dispatch({ type: 'RESTORE_SNAPSHOT', lists: latest.lists });
+        setArchived(latest.archived);
+        setCustomTags(latest.customTags || []);
+      }
+      clearUndoTimer();
+      setToast(null);
+      return rest;
+    });
+  }, [clearUndoTimer, snapshot]);
 
   useEffect(() => () => clearUndoTimer(), [clearUndoTimer]);
 
@@ -247,37 +354,85 @@ export function useLists() {
     (message, fn) => {
       const before = snapshot();
       fn();
-      // Defer push so refs update after React processes? Actually fn sync dispatches
-      // but listsRef updates in useEffect. Need to compute next state or capture before.
       pushHistory(message, before);
     },
     [snapshot, pushHistory]
   );
 
-  const addList = useCallback((name, style = {}) => {
-    dispatch({
-      type: 'ADD_LIST',
-      name,
-      color: style.color,
-      icon: style.icon,
-    });
+  const updateSettings = useCallback((patch) => {
+    setSettings((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const addCustomTag = useCallback((label) => {
+    const tag = createCustomTag(label, customTagsRef.current);
+    if (!tag) return null;
+    if (!customTagsRef.current.some((t) => t.id === tag.id)) {
+      setCustomTags((prev) => [...prev, normalizeCustomTag(tag)]);
+    }
+    return tag;
+  }, []);
+
+  const addList = useCallback(
+    (name, style = {}) => {
+      withUndo('List added', () => {
+        dispatch({
+          type: 'ADD_LIST',
+          name,
+          color: style.color,
+          icon: style.icon,
+          customTags: customTagsRef.current,
+        });
+      });
+      updateSettings({ lastUsedListId: '' });
+    },
+    [withUndo, updateSettings]
+  );
+
+  const duplicateList = useCallback(
+    (listId) => {
+      withUndo('List duplicated', () => {
+        dispatch({ type: 'DUPLICATE_LIST', listId });
+      });
+    },
+    [withUndo]
+  );
+
+  const saveListAsTemplate = useCallback((listId) => {
+    const list = listsRef.current.find((l) => l.id === listId);
+    if (!list) return;
+    const template = {
+      id: createId(),
+      name: list.name,
+      icon: list.icon,
+      color: list.color,
+      items: list.items.map((i) => ({
+        text: i.text,
+        description: i.description,
+        dueDate: '',
+        tags: i.tags,
+        priority: i.priority,
+        subItems: (i.subItems || []).map((s) => ({ text: s.text })),
+      })),
+    };
+    setUserTemplates((prev) => [...prev, template]);
   }, []);
 
   const addTemplate = useCallback(
     (templateId) => {
-      const template = TEMPLATES.find((t) => t.id === templateId);
+      const allTemplates = [...TEMPLATES, ...userTemplates];
+      const template = allTemplates.find((t) => t.id === templateId);
       if (!template) return;
       withUndo(`Added "${template.name}" template`, () => {
         const list = normalizeList({
           name: template.name,
           icon: template.icon,
           color: template.color,
-          items: template.items.map((item) => normalizeItem(item)),
-        });
+          items: template.items.map((item) => normalizeItem(item, customTagsRef.current)),
+        }, customTagsRef.current);
         dispatch({ type: 'SET_LISTS', lists: [...listsRef.current, list] });
       });
     },
-    [withUndo]
+    [withUndo, userTemplates]
   );
 
   const renameList = useCallback(
@@ -289,9 +444,29 @@ export function useLists() {
     [withUndo]
   );
 
-  const setListStyle = useCallback((listId, { color, icon }) => {
-    dispatch({ type: 'SET_LIST_STYLE', listId, color, icon });
-  }, []);
+  const setListStyle = useCallback(
+    (listId, { color, icon }) => {
+      withUndo('List style updated', () => {
+        dispatch({ type: 'SET_LIST_STYLE', listId, color, icon });
+      });
+    },
+    [withUndo]
+  );
+
+  const setListMeta = useCallback(
+    (listId, patch) => {
+      dispatch({ type: 'SET_LIST_META', listId, patch });
+      if (patch.pinned !== undefined) {
+        setSettings((prev) => {
+          const pinned = new Set(prev.pinnedListIds || []);
+          if (patch.pinned) pinned.add(listId);
+          else pinned.delete(listId);
+          return { ...prev, pinnedListIds: [...pinned] };
+        });
+      }
+    },
+    []
+  );
 
   const deleteList = useCallback(
     (listId) => {
@@ -304,40 +479,143 @@ export function useLists() {
 
   const reorderLists = useCallback(
     (activeId, overId) => {
+      if (settings.focusListId) return;
       withUndo('Lists reordered', () => {
         dispatch({ type: 'REORDER_LISTS', activeId, overId });
+      });
+    },
+    [withUndo, settings.focusListId]
+  );
+
+  const addItem = useCallback(
+    (listId, text) => {
+      const parsed = parseQuickAdd(text);
+      parsed.tags.forEach((tagId) => {
+        if (!customTagsRef.current.some((t) => t.id === tagId) &&
+            !['work', 'personal', 'urgent', 'errand', 'home', 'idea'].includes(tagId)) {
+          addCustomTag(tagId);
+        }
+      });
+      withUndo('Item added', () => {
+        dispatch({
+          type: 'ADD_ITEM',
+          listId,
+          text: parsed.text,
+          tags: parsed.tags,
+          dueDate: parsed.dueDate,
+          priority: parsed.priority,
+          customTags: customTagsRef.current,
+        });
+      });
+      updateSettings({ lastUsedListId: listId });
+    },
+    [withUndo, addCustomTag, updateSettings]
+  );
+
+  const duplicateItem = useCallback(
+    (listId, itemId) => {
+      withUndo('Item duplicated', () => {
+        dispatch({ type: 'DUPLICATE_ITEM', listId, itemId });
       });
     },
     [withUndo]
   );
 
-  const addItem = useCallback((listId, text) => {
-    dispatch({ type: 'ADD_ITEM', listId, text });
-  }, []);
+  const moveItem = useCallback(
+    (fromListId, itemId, toListId) => {
+      if (fromListId === toListId) return;
+      withUndo('Item moved', () => {
+        dispatch({ type: 'MOVE_ITEM', fromListId, itemId, toListId });
+      });
+    },
+    [withUndo]
+  );
 
-  const toggleItem = useCallback((listId, itemId) => {
-    dispatch({ type: 'TOGGLE_ITEM', listId, itemId });
-  }, []);
+  const bulkUpdateItems = useCallback(
+    (listId, itemIds, patch) => {
+      withUndo(`Updated ${itemIds.length} item(s)`, () => {
+        dispatch({
+          type: 'BULK_UPDATE_ITEMS',
+          listId,
+          itemIds,
+          patch,
+          customTags: customTagsRef.current,
+        });
+      });
+    },
+    [withUndo]
+  );
 
-  const renameItem = useCallback((listId, itemId, name) => {
-    dispatch({ type: 'RENAME_ITEM', listId, itemId, name });
-  }, []);
+  const bulkMoveItems = useCallback(
+    (fromListId, itemIds, toListId) => {
+      withUndo(`Moved ${itemIds.length} item(s)`, () => {
+        dispatch({ type: 'BULK_MOVE_ITEMS', fromListId, itemIds, toListId });
+      });
+    },
+    [withUndo]
+  );
 
-  const setItemDescription = useCallback((listId, itemId, description) => {
-    dispatch({ type: 'SET_ITEM_DESCRIPTION', listId, itemId, description });
-  }, []);
+  const bulkArchiveItems = useCallback(
+    (listId, itemIds) => {
+      const list = listsRef.current.find((l) => l.id === listId);
+      if (!list) return;
+      const items = list.items.filter((i) => itemIds.includes(i.id));
+      if (!items.length) return;
+      withUndo(`Archived ${items.length} item(s)`, () => {
+        dispatch({ type: 'BULK_ARCHIVE_ITEMS', listId, itemIds });
+        setArchived((prev) => [
+          ...items.map((item) => ({
+            ...item,
+            archivedAt: new Date().toISOString(),
+            fromListId: list.id,
+            fromListName: list.name,
+          })),
+          ...prev,
+        ]);
+      });
+    },
+    [withUndo]
+  );
 
-  const setItemDueDate = useCallback((listId, itemId, dueDate) => {
-    dispatch({ type: 'SET_ITEM_DUE_DATE', listId, itemId, dueDate });
-  }, []);
+  const toggleItem = useCallback(
+    (listId, itemId) => {
+      const list = listsRef.current.find((l) => l.id === listId);
+      const item = list?.items.find((i) => i.id === itemId);
+      const wasComplete = item?.complete;
+      withUndo(wasComplete ? 'Item unchecked' : 'Item completed', () => {
+        dispatch({ type: 'TOGGLE_ITEM', listId, itemId });
+      });
+      if (!wasComplete && list) {
+        const othersIncomplete = list.items.filter((i) => i.id !== itemId && !i.complete);
+        if (othersIncomplete.length === 0) {
+          setTimeout(() => launchConfetti(), 100);
+        }
+      }
+    },
+    [withUndo]
+  );
 
-  const setItemTags = useCallback((listId, itemId, tags) => {
-    dispatch({ type: 'SET_ITEM_TAGS', listId, itemId, tags });
-  }, []);
+  const renameItem = useCallback(
+    (listId, itemId, name) => {
+      withUndo('Item renamed', () => {
+        dispatch({ type: 'RENAME_ITEM', listId, itemId, name });
+      });
+    },
+    [withUndo]
+  );
 
-  const updateItemFields = useCallback((listId, itemId, patch) => {
-    dispatch({ type: 'UPDATE_ITEM', listId, itemId, patch });
-  }, []);
+  const updateItemFields = useCallback(
+    (listId, itemId, patch) => {
+      dispatch({
+        type: 'UPDATE_ITEM',
+        listId,
+        itemId,
+        patch,
+        customTags: customTagsRef.current,
+      });
+    },
+    []
+  );
 
   const addSubItem = useCallback((listId, itemId, text) => {
     dispatch({ type: 'ADD_SUB_ITEM', listId, itemId, text });
@@ -427,7 +705,12 @@ export function useLists() {
       if (!listId) return;
       withUndo('Item restored', () => {
         const { archivedAt, fromListId, fromListName, ...item } = entry;
-        dispatch({ type: 'RESTORE_ITEM', listId, item });
+        dispatch({
+          type: 'RESTORE_ITEM',
+          listId,
+          item,
+          customTags: customTagsRef.current,
+        });
         setArchived((prev) => prev.filter((a) => a.id !== archivedId));
       });
     },
@@ -444,16 +727,12 @@ export function useLists() {
   );
 
   const deleteItem = useCallback(
-    (listId, itemId) => {
-      archiveItem(listId, itemId);
-    },
+    (listId, itemId) => archiveItem(listId, itemId),
     [archiveItem]
   );
 
   const deleteCompletedItems = useCallback(
-    (listId) => {
-      archiveCompletedItems(listId);
-    },
+    (listId) => archiveCompletedItems(listId),
     [archiveCompletedItems]
   );
 
@@ -467,7 +746,7 @@ export function useLists() {
         });
         return result;
       }
-      const result = normalizeLists(data);
+      const result = normalizeLists(data, customTagsRef.current);
       if (!result.ok) return result;
       withUndo('Lists imported', () => {
         dispatch({ type: 'SET_LISTS', lists: result.lists });
@@ -477,25 +756,46 @@ export function useLists() {
     [withUndo]
   );
 
+  const exportBackup = useCallback(() => {
+    downloadBackup(listsRef.current, archivedRef.current, customTagsRef.current);
+    updateSettings({ lastBackupAt: new Date().toISOString() });
+  }, [updateSettings]);
+
+  const showBackupReminder = needsBackupReminder(settings);
+
   return {
     lists,
     archived,
+    customTags,
+    userTemplates,
+    settings,
     undoStack,
+    redoStack,
     toast,
+    storageError,
+    showBackupReminder,
     applyUndo,
+    applyRedo,
     dismissToast,
+    updateSettings,
+    addCustomTag,
     addList,
+    duplicateList,
+    saveListAsTemplate,
     addTemplate,
     renameList,
     setListStyle,
+    setListMeta,
     deleteList,
     reorderLists,
     addItem,
+    duplicateItem,
+    moveItem,
+    bulkUpdateItems,
+    bulkMoveItems,
+    bulkArchiveItems,
     toggleItem,
     renameItem,
-    setItemDescription,
-    setItemDueDate,
-    setItemTags,
     updateItemFields,
     addSubItem,
     toggleSubItem,
@@ -509,5 +809,7 @@ export function useLists() {
     restoreArchived,
     purgeArchived,
     importLists,
+    exportBackup,
+    clearStorageError: () => setStorageError(null),
   };
 }

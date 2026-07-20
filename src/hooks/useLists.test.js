@@ -1,3 +1,4 @@
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useLists } from './useLists';
 import { STORAGE_KEY, ARCHIVE_KEY } from '../utils/storage';
@@ -51,7 +52,7 @@ test('importLists validates and replaces', () => {
 });
 
 test('archive item and undo restores it', () => {
-  jest.useFakeTimers();
+  vi.useFakeTimers();
   const { result } = renderHook(() => useLists());
 
   act(() => {
@@ -77,7 +78,7 @@ test('archive item and undo restores it', () => {
 
   expect(result.current.lists[0].items[0].text).toBe('Keep me');
   expect(result.current.archived).toHaveLength(0);
-  jest.useRealTimers();
+  vi.useRealTimers();
 });
 
 test('merge import combines by name', () => {
