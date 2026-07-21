@@ -1,8 +1,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { getTagById } from '../utils/tags';
-import { isOverdue, isDueSoon } from '../utils/helpers';
-import { LIST_COLORS, PRIORITIES } from '../utils/constants';
+import { getTagById } from '../../utils/tags';
+import { isOverdue, isDueSoon } from '../../utils/helpers';
+import { LIST_COLORS, PRIORITIES } from '../../utils/constants';
 
 function AllItemsView({ rows, customTags, onItemClick, bulkMode, selectedIds, onToggleSelect }) {
   if (!rows.length) {

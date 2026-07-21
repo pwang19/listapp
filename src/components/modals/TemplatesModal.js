@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import Modal from './Modal';
-import { TEMPLATES } from '../utils/templates';
+import { TEMPLATES } from '../../utils/templates';
 
 function TemplatesModal({ isOpen, onClose, onSelect, userTemplates = [] }) {
   const allTemplates = [...TEMPLATES, ...userTemplates];

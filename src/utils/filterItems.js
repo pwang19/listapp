@@ -40,3 +40,9 @@ export function listMatchesFilters(list, { searchQuery = '', tagFilter = '', ite
 export function hasActiveFilters({ searchQuery = '', tagFilter = '', itemFilter = 'all' } = {}) {
   return Boolean(searchQuery.trim() || tagFilter || itemFilter !== 'all');
 }
+
+export function filterItemRows(rows, filters = {}) {
+  const filtered = filterItems(rows.map((r) => r.item), filters);
+  const filteredIds = new Set(filtered.map((i) => i.id));
+  return rows.filter((r) => filteredIds.has(r.item.id));
+}

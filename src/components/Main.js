@@ -1,40 +1,32 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  DndContext,
-  closestCenter,
   PointerSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
-  DragOverlay,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  rectSortingStrategy,
-  sortableKeyboardCoordinates,
-} from '@dnd-kit/sortable';
-import List from './List';
-import ConfirmModal from './ConfirmModal';
-import ImportExportModal from './ImportExportModal';
-import Toast from './Toast';
-import ArchiveShelf from './ArchiveShelf';
-import TemplatesModal from './TemplatesModal';
-import PrintShareModal from './PrintShareModal';
-import SortableRow from './SortableRow';
-import UpcomingView from './UpcomingView';
-import AllItemsView from './AllItemsView';
-import KanbanView from './KanbanView';
-import CommandPalette from './CommandPalette';
-import BulkActionBar from './BulkActionBar';
-import LiveRegion from './LiveRegion';
-import ToolbarMoreMenu from './ToolbarMoreMenu';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import GridView from './GridView';
+import Toolbar from './Toolbar';
+import ListItemModal from './lists/ListItemModal';
+import ConfirmModal from './modals/ConfirmModal';
+import ImportExportModal from './modals/ImportExportModal';
+import Toast from './ui/Toast';
+import ArchiveShelf from './modals/ArchiveShelf';
+import TemplatesModal from './modals/TemplatesModal';
+import PrintShareModal from './modals/PrintShareModal';
+import UpcomingView from './views/UpcomingView';
+import AllItemsView from './views/AllItemsView';
+import KanbanView from './views/KanbanView';
+import CommandPalette from './ui/CommandPalette';
+import BulkActionBar from './ui/BulkActionBar';
+import LiveRegion from './ui/LiveRegion';
 import { useLists } from '../hooks/useLists';
 import { getAllTags } from '../utils/tags';
-import { listMatchesFilters, hasActiveFilters } from '../utils/filterItems';
+import { listMatchesFilters, hasActiveFilters, filterItemRows } from '../utils/filterItems';
 import { sortListsForDisplay } from '../utils/sortItems';
 import { getUpcomingItems, flattenAllItems } from '../utils/helpers';
 import { decodeListFromHash } from '../utils/shareLink';
-import { VIEW_MODES } from '../utils/constants';
 import { normalizeList } from '../utils/normalizeLists';
 
 function Main() {
@@ -104,6 +96,7 @@ function Main() {
   const [shareImportOpen, setShareImportOpen] = useState(false);
   const [pendingShareList, setPendingShareList] = useState(null);
   const [activeDragId, setActiveDragId] = useState(null);
+  const [modalTarget, setModalTarget] = useState(null);
 
   const searchRef = useRef(null);
   const newListRef = useRef(null);
@@ -120,7 +113,7 @@ function Main() {
 
   const anyModalOpen =
     deleteModalOpen || importExportModalOpen || archiveOpen || templatesOpen ||
-    printOpen || helpOpen || commandOpen || shareImportOpen;
+    printOpen || helpOpen || commandOpen || shareImportOpen || Boolean(modalTarget);
 
   const listsToShow = useMemo(() => {
     const filtered = lists.filter((list) =>
@@ -139,23 +132,21 @@ function Main() {
     [lists]
   );
 
-  const allItemRows = useMemo(() => {
-    const rows = flattenAllItems(lists);
-    return rows.filter(({ item }) => {
-      if (itemFilter === 'active' && item.complete) return false;
-      if (itemFilter === 'completed' && !item.complete) return false;
-      if (tagFilter && !(item.tags || []).includes(tagFilter)) return false;
-      const q = searchQuery.trim().toLowerCase();
-      if (!q) return true;
-      return [item.text, item.description || ''].join(' ').toLowerCase().includes(q);
-    });
-  }, [lists, itemFilter, tagFilter, searchQuery]);
-
-  const [modalTarget, setModalTarget] = useState(null);
+  const allItemRows = useMemo(
+    () => filterItemRows(flattenAllItems(lists), { itemFilter, searchQuery, tagFilter }),
+    [lists, itemFilter, tagFilter, searchQuery]
+  );
 
   const openItemModal = useCallback((listId, itemId) => {
     setModalTarget({ listId, itemId });
   }, []);
+
+  const closeItemModal = useCallback(() => {
+    setModalTarget(null);
+  }, []);
+
+  const modalList = modalTarget ? lists.find((l) => l.id === modalTarget.listId) : null;
+  const modalItem = modalList?.items.find((i) => i.id === modalTarget?.itemId) ?? null;
 
   useEffect(() => {
     const shared = decodeListFromHash(window.location.hash);
@@ -408,95 +399,6 @@ function Main() {
     reorderLists(active.id, over.id);
   };
 
-  const renderGrid = () => {
-    if (listsToShow.length === 0) {
-      return (
-        <div className="empty-state-block">
-          <p className="empty-state">
-            {lists.length === 0
-              ? 'No lists yet. Type a name below, press Enter, or open Templates (t).'
-              : 'No lists match the current search or tag filter.'}
-          </p>
-          {filtersActive ? (
-            <button type="button" className="btn btn-secondary" onClick={clearFilters}>
-              Clear filters
-            </button>
-          ) : lists.length === 0 ? (
-            <button type="button" className="btn btn-primary" onClick={() => setTemplatesOpen(true)}>
-              Browse templates
-            </button>
-          ) : null}
-        </div>
-      );
-    }
-
-    return (
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={(e) => setActiveDragId(e.active.id)}
-        onDragEnd={handleListsDragEnd}
-      >
-        <SortableContext items={listsToShow.map((l) => l.id)} strategy={rectSortingStrategy}>
-          <div className={`lists-grid${settings.focusListId ? ' lists-grid--focus' : ''}`}>
-            {listsToShow.map((list) => (
-              <SortableRow key={list.id} id={list.id} className="list-sortable">
-                <List
-                  id={list.id}
-                  name={list.name}
-                  color={list.color}
-                  icon={list.icon}
-                  items={list.items || []}
-                  sortMode={list.sortMode || 'manual'}
-                  collapsed={list.collapsed}
-                  pinned={(settings.pinnedListIds || []).includes(list.id)}
-                  itemFilter={itemFilter}
-                  searchQuery={searchQuery}
-                  tagFilter={tagFilter}
-                  customTags={customTags}
-                  allLists={lists}
-                  bulkMode={bulkMode}
-                  bulkSelectedIds={new Set(
-                    [...bulkSelected.values()]
-                      .filter((v) => v.listId === list.id)
-                      .map((v) => v.itemId)
-                  )}
-                  onBulkToggle={toggleBulkSelect}
-                  filtersActive={filtersActive}
-                  onNameChange={(newName) => renameList(list.id, newName)}
-                  onDelete={() => { setListToDelete(list.id); setDeleteModalOpen(true); }}
-                  onDuplicate={() => duplicateList(list.id)}
-                  onSaveAsTemplate={() => { saveListAsTemplate(list.id); announce('Saved as template'); }}
-                  onFocusMode={() => updateSettings({ focusListId: list.id, viewMode: 'grid' })}
-                  onShare={(msg) => announce(msg)}
-                  onAddItem={(text) => addItem(list.id, text)}
-                  onItemCheckboxChange={(itemId) => toggleItem(list.id, itemId)}
-                  onItemNameChange={(itemId, newName) => renameItem(list.id, itemId, newName)}
-                  onItemSave={(itemId, patch) => updateItemFields(list.id, itemId, patch)}
-                  onDuplicateItem={(itemId) => duplicateItem(list.id, itemId)}
-                  onMoveItem={moveItem}
-                  onAddSubItem={(itemId, text) => addSubItem(list.id, itemId, text)}
-                  onToggleSubItem={(itemId, subId) => toggleSubItem(list.id, itemId, subId)}
-                  onDeleteSubItem={(itemId, subId) => deleteSubItem(list.id, itemId, subId)}
-                  onDeleteItem={(itemId) => deleteItem(list.id, itemId)}
-                  onDeleteCompletedItems={() => deleteCompletedItems(list.id)}
-                  onReorderItems={(a, o) => reorderItems(list.id, a, o)}
-                  onReorderSubItems={(itemId, a, o) => reorderSubItems(list.id, itemId, a, o)}
-                  onSetListStyle={(style) => setListStyle(list.id, style)}
-                  onSetListMeta={(patch) => setListMeta(list.id, patch)}
-                  onAddCustomTag={addCustomTag}
-                />
-              </SortableRow>
-            ))}
-          </div>
-        </SortableContext>
-        <DragOverlay>
-          {activeDragId ? <div className="drag-overlay-hint">Dragging…</div> : null}
-        </DragOverlay>
-      </DndContext>
-    );
-  };
-
   return (
     <div className="main" ref={fileDropRef}>
       <LiveRegion message={liveMessage} />
@@ -518,85 +420,30 @@ function Main() {
         </div>
       ) : null}
 
-      <div className="toolbar">
-        <input
-          ref={searchRef}
-          type="search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search lists and items… (/)"
-          aria-label="Search lists and items"
-          className="text-input toolbar-search"
-        />
-        <div className="filter-group" role="group" aria-label="Item status filter">
-          {['all', 'active', 'completed'].map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={`chip-btn${itemFilter === value ? ' is-active' : ''}`}
-              onClick={() => setItemFilter(value)}
-            >
-              {value.charAt(0).toUpperCase() + value.slice(1)}
-            </button>
-          ))}
-        </div>
-        <select
-          className="style-select"
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value)}
-          aria-label="Filter by tag"
-        >
-          <option value="">All tags</option>
-          {allTags.map((tag) => (
-            <option key={tag.id} value={tag.id}>{tag.label}</option>
-          ))}
-        </select>
-        {filtersActive ? (
-          <button type="button" className="btn-link toolbar-clear" onClick={clearFilters}>
-            Clear filters
-          </button>
-        ) : null}
-      </div>
-
-      <div className="toolbar toolbar--actions">
-        <div className="view-tabs" role="tablist" aria-label="View mode">
-          {VIEW_MODES.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              role="tab"
-              aria-selected={viewMode === v.id}
-              className={`chip-btn${viewMode === v.id ? ' is-active' : ''}`}
-              onClick={() => updateSettings({ viewMode: v.id })}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-        <div className="toolbar-actions-end">
-          <button
-            type="button"
-            className="btn btn-secondary btn-icon"
-            onClick={() => updateSettings({ darkMode: settings.darkMode === 'dark' ? 'light' : 'dark' })}
-            aria-label="Toggle dark mode"
-          >
-            {settings.darkMode === 'dark' ? '☀️' : '🌙'}
-          </button>
-          <ToolbarMoreMenu
-            archivedCount={archived.length}
-            bulkMode={bulkMode}
-            onTemplates={() => setTemplatesOpen(true)}
-            onArchive={() => setArchiveOpen(true)}
-            onPrintShare={() => setPrintOpen(true)}
-            onToggleBulk={() => setBulkMode((v) => !v)}
-            onImportExport={() => setImportExportModalOpen(true)}
-            onHelp={() => setHelpOpen(true)}
-          />
-          <button type="button" className="btn btn-secondary btn-icon" onClick={() => setCommandOpen(true)} title="Cmd+K" aria-label="Command palette">
-            ⌘K
-          </button>
-        </div>
-      </div>
+      <Toolbar
+        searchRef={searchRef}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        itemFilter={itemFilter}
+        onItemFilterChange={setItemFilter}
+        tagFilter={tagFilter}
+        onTagFilterChange={setTagFilter}
+        allTags={allTags}
+        filtersActive={filtersActive}
+        onClearFilters={clearFilters}
+        viewMode={viewMode}
+        settings={settings}
+        onUpdateSettings={updateSettings}
+        archivedCount={archived.length}
+        bulkMode={bulkMode}
+        onTemplates={() => setTemplatesOpen(true)}
+        onArchive={() => setArchiveOpen(true)}
+        onPrintShare={() => setPrintOpen(true)}
+        onToggleBulk={() => setBulkMode((v) => !v)}
+        onImportExport={() => setImportExportModalOpen(true)}
+        onHelp={() => setHelpOpen(true)}
+        onCommandPalette={() => setCommandOpen(true)}
+      />
 
       <BulkActionBar
         selectedCount={bulkSelected.size}
@@ -608,7 +455,50 @@ function Main() {
         onClear={() => setBulkSelected(new Map())}
       />
 
-      {viewMode === 'grid' ? renderGrid() : null}
+      {viewMode === 'grid' ? (
+        <GridView
+          lists={lists}
+          listsToShow={listsToShow}
+          settings={settings}
+          itemFilter={itemFilter}
+          searchQuery={searchQuery}
+          tagFilter={tagFilter}
+          customTags={customTags}
+          bulkMode={bulkMode}
+          bulkSelected={bulkSelected}
+          filtersActive={filtersActive}
+          sensors={sensors}
+          activeDragId={activeDragId}
+          onDragStart={(e) => setActiveDragId(e.active.id)}
+          onDragEnd={handleListsDragEnd}
+          onOpenTemplates={() => setTemplatesOpen(true)}
+          onClearFilters={clearFilters}
+          onBulkToggle={toggleBulkSelect}
+          onOpenItem={openItemModal}
+          onDeleteList={(listId) => { setListToDelete(listId); setDeleteModalOpen(true); }}
+          onDuplicateList={duplicateList}
+          onSaveAsTemplate={(listId) => { saveListAsTemplate(listId); announce('Saved as template'); }}
+          onFocusMode={(listId) => updateSettings({ focusListId: listId, viewMode: 'grid' })}
+          onShare={(msg) => announce(msg)}
+          onAddItem={addItem}
+          onToggleItem={toggleItem}
+          onRenameItem={renameItem}
+          onUpdateItemFields={updateItemFields}
+          onDuplicateItem={duplicateItem}
+          onMoveItem={moveItem}
+          onAddSubItem={addSubItem}
+          onToggleSubItem={toggleSubItem}
+          onDeleteSubItem={deleteSubItem}
+          onDeleteItem={deleteItem}
+          onDeleteCompletedItems={deleteCompletedItems}
+          onReorderItems={reorderItems}
+          onReorderSubItems={reorderSubItems}
+          onSetListStyle={setListStyle}
+          onSetListMeta={setListMeta}
+          onAddCustomTag={addCustomTag}
+          onRenameList={renameList}
+        />
+      ) : null}
       {viewMode === 'upcoming' ? (
         <UpcomingView items={upcomingItems} onItemClick={openItemModal} />
       ) : null}
@@ -687,6 +577,7 @@ function Main() {
         onClose={() => setArchiveOpen(false)}
         archived={archived}
         lists={lists}
+        customTags={customTags}
         onRestore={restoreArchived}
         onPurge={purgeArchived}
       />
@@ -701,6 +592,34 @@ function Main() {
       <PrintShareModal isOpen={printOpen} onClose={() => setPrintOpen(false)} lists={lists} />
 
       <CommandPalette isOpen={commandOpen} onClose={() => setCommandOpen(false)} commands={commands} />
+
+      {modalTarget && modalItem ? (
+        <ListItemModal
+          isOpen
+          itemName={modalItem.text}
+          description={modalItem.description || ''}
+          dueDate={modalItem.dueDate || ''}
+          tags={modalItem.tags || []}
+          priority={modalItem.priority || 0}
+          recurring={modalItem.recurring || 'none'}
+          completedAt={modalItem.completedAt || ''}
+          subItems={modalItem.subItems || []}
+          customTags={customTags}
+          lists={lists}
+          currentListId={modalTarget.listId}
+          onClose={closeItemModal}
+          onDelete={() => { deleteItem(modalTarget.listId, modalItem.id); closeItemModal(); }}
+          onSaveChanges={(patch) => updateItemFields(modalTarget.listId, modalItem.id, patch)}
+          onNameChange={(newName) => renameItem(modalTarget.listId, modalItem.id, newName)}
+          onDuplicate={() => duplicateItem(modalTarget.listId, modalItem.id)}
+          onMove={(toListId) => { moveItem(modalTarget.listId, modalItem.id, toListId); closeItemModal(); }}
+          onAddSubItem={(text) => addSubItem(modalTarget.listId, modalItem.id, text)}
+          onToggleSubItem={(subId) => toggleSubItem(modalTarget.listId, modalItem.id, subId)}
+          onDeleteSubItem={(subId) => deleteSubItem(modalTarget.listId, modalItem.id, subId)}
+          onReorderSubItems={(a, o) => reorderSubItems(modalTarget.listId, modalItem.id, a, o)}
+          onAddCustomTag={addCustomTag}
+        />
+      ) : null}
 
       <ConfirmModal
         isOpen={helpOpen}

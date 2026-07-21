@@ -1,4 +1,4 @@
-import './App.css';
+import './styles/index.css';
 import React from 'react';
 import Main from './components/Main';
 

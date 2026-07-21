@@ -14,15 +14,14 @@ import {
   verticalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import EditableText from './EditableText';
+import EditableText from '../ui/EditableText';
 import ListItemDisplay from './ListItemDisplay';
-import ListItemModal from './ListItemModal';
 import ListCustomizePopover from './ListCustomizePopover';
-import { LIST_COLORS } from '../utils/constants';
-import { filterItems, hasActiveFilters } from '../utils/filterItems';
-import { sortItems } from '../utils/sortItems';
-import { listToMarkdown } from '../utils/helpers';
-import { encodeListToHash } from '../utils/shareLink';
+import { LIST_COLORS } from '../../utils/constants';
+import { filterItems } from '../../utils/filterItems';
+import { sortItems } from '../../utils/sortItems';
+import { listToMarkdown } from '../../utils/helpers';
+import { encodeListToHash } from '../../utils/shareLink';
 
 const itemShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -78,11 +77,10 @@ function List({
   onSetListStyle,
   onSetListMeta,
   onAddCustomTag,
+  onOpenItem,
   filtersActive = false,
 }) {
   const [inputValue, setInputValue] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const iconButtonRef = useRef(null);
@@ -102,8 +100,6 @@ function List({
 
   const canReorder = sortMode === 'manual' && !filtersActive;
 
-  const selectedItem = items.find((item) => item.id === selectedItemId) || null;
-
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' && inputValue.trim() !== '') {
       onAddItem(inputValue.trim());
@@ -112,13 +108,7 @@ function List({
   };
 
   const handleItemNameClick = (itemId) => {
-    setSelectedItemId(itemId);
-    setModalOpen(true);
-  };
-
-  const handleModalClose = () => {
-    setModalOpen(false);
-    setSelectedItemId(null);
+    onOpenItem?.(itemId);
   };
 
   const handleDragEnd = (event) => {
@@ -319,34 +309,6 @@ function List({
             </div>
           </>
         ) : null}
-
-        {selectedItem ? (
-          <ListItemModal
-            isOpen={modalOpen}
-            itemName={selectedItem.text}
-            description={selectedItem.description || ''}
-            dueDate={selectedItem.dueDate || ''}
-            tags={selectedItem.tags || []}
-            priority={selectedItem.priority || 0}
-            recurring={selectedItem.recurring || 'none'}
-            completedAt={selectedItem.completedAt || ''}
-            subItems={selectedItem.subItems || []}
-            customTags={customTags}
-            lists={allLists}
-            currentListId={listId}
-            onClose={handleModalClose}
-            onDelete={() => { onDeleteItem(selectedItem.id); handleModalClose(); }}
-            onSaveChanges={(patch) => onItemSave(selectedItem.id, patch)}
-            onNameChange={(newName) => onItemNameChange(selectedItem.id, newName)}
-            onDuplicate={() => onDuplicateItem(selectedItem.id)}
-            onMove={(toListId) => { onMoveItem(listId, selectedItem.id, toListId); handleModalClose(); }}
-            onAddSubItem={(text) => onAddSubItem(selectedItem.id, text)}
-            onToggleSubItem={(subId) => onToggleSubItem(selectedItem.id, subId)}
-            onDeleteSubItem={(subId) => onDeleteSubItem(selectedItem.id, subId)}
-            onReorderSubItems={(a, o) => onReorderSubItems(selectedItem.id, a, o)}
-            onAddCustomTag={onAddCustomTag}
-          />
-        ) : null}
       </article>
     </ListDropZone>
   );
@@ -391,6 +353,7 @@ List.propTypes = {
   onSetListStyle: PropTypes.func.isRequired,
   onSetListMeta: PropTypes.func,
   onAddCustomTag: PropTypes.func,
+  onOpenItem: PropTypes.func,
   filtersActive: PropTypes.bool,
 };
 

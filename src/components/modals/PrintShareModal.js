@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import Modal from './Modal';
-import { listsToMarkdown, renderMarkdown } from '../utils/helpers';
+import { listsToMarkdown, renderMarkdown } from '../../utils/helpers';
 
 function PrintShareModal({ isOpen, onClose, lists }) {
   const markdown = useMemo(() => listsToMarkdown(lists), [lists]);

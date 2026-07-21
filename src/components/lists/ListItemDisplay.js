@@ -1,9 +1,9 @@
 import React, { useId, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { getTagById } from '../utils/tags';
-import { isOverdue, isDueSoon } from '../utils/helpers';
-import { PRIORITIES } from '../utils/constants';
-import SortableRow from './SortableRow';
+import { getTagById } from '../../utils/tags';
+import { isOverdue, isDueSoon } from '../../utils/helpers';
+import { PRIORITIES } from '../../utils/constants';
+import SortableRow from '../ui/SortableRow';
 
 const subItemShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -172,6 +172,25 @@ function ListItemDisplay({
               ) : null}
             </div>
           ) : null}
+        </div>
+      ) : expanded && onAddSubItem ? (
+        <div className="inline-subitems-section">
+          <div className="inline-subitems">
+            <input
+              type="text"
+              className="text-input text-input--sm"
+              placeholder="Quick add sub-item…"
+              value={subInput}
+              onChange={(e) => setSubInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && subInput.trim()) {
+                  onAddSubItem(subInput.trim());
+                  setSubInput('');
+                }
+              }}
+              autoFocus
+            />
+          </div>
         </div>
       ) : onAddSubItem ? (
         <button

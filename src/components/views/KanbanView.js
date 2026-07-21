@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { getTagById } from '../utils/tags';
+import { getTagById } from '../../utils/tags';
 
 function KanbanView({ lists, customTags, groupBy, onItemClick }) {
   const columns = [];

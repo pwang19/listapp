@@ -18,6 +18,8 @@ export const TAG_PALETTE = [
   { id: 'idea', label: 'Idea', color: '#7c3aed' },
 ];
 
+export const BUILTIN_TAG_IDS = TAG_PALETTE.map((t) => t.id);
+
 export const PRIORITIES = [
   { id: 0, label: 'None', color: '#94a3b8' },
   { id: 1, label: 'High', color: '#e11d48' },

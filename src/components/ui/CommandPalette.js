@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import Modal from './Modal';
+import Modal from '../modals/Modal';
 
 function CommandPalette({ isOpen, onClose, commands }) {
   const [query, setQuery] = useState('');

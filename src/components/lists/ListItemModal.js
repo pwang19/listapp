@@ -13,13 +13,13 @@ import {
   verticalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import EditableText from './EditableText';
-import ConfirmModal from './ConfirmModal';
-import Modal from './Modal';
-import SortableRow from './SortableRow';
-import { PRIORITIES, RECURRING_OPTIONS } from '../utils/constants';
-import { getAllTags } from '../utils/tags';
-import { renderMarkdown } from '../utils/helpers';
+import EditableText from '../ui/EditableText';
+import ConfirmModal from '../modals/ConfirmModal';
+import Modal from '../modals/Modal';
+import SortableRow from '../ui/SortableRow';
+import { PRIORITIES, RECURRING_OPTIONS } from '../../utils/constants';
+import { getAllTags } from '../../utils/tags';
+import { renderMarkdown } from '../../utils/helpers';
 
 const subItemShape = PropTypes.shape({
   id: PropTypes.string.isRequired,

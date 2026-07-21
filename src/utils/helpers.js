@@ -81,6 +81,25 @@ export function renderMarkdown(text) {
   return blocks.join('');
 }
 
+function formatItemMarkdown(item, { includePriority = false } = {}) {
+  const lines = [];
+  const box = item.complete ? 'x' : ' ';
+  const due = item.dueDate ? ` _(due ${item.dueDate})_` : '';
+  const tags = item.tags?.length ? ` \`${item.tags.join(', ')}\`` : '';
+  const pri = includePriority && item.priority ? ` !p${item.priority}` : '';
+  lines.push(`- [${box}] ${item.text}${due}${tags}${pri}`);
+  if (item.description) {
+    item.description.split('\n').forEach((line) => {
+      lines.push(`  > ${line}`);
+    });
+  }
+  (item.subItems || []).forEach((sub) => {
+    const subBox = sub.complete ? 'x' : ' ';
+    lines.push(`  - [${subBox}] ${sub.text}`);
+  });
+  return lines;
+}
+
 export function listsToMarkdown(lists) {
   if (!lists.length) return '# Lists\n\n_No lists yet._\n';
 
@@ -94,20 +113,7 @@ export function listsToMarkdown(lists) {
       return;
     }
     list.items.forEach((item) => {
-      const box = item.complete ? 'x' : ' ';
-      const due = item.dueDate ? ` _(due ${item.dueDate})_` : '';
-      const tags =
-        item.tags && item.tags.length ? ` \`${item.tags.join(', ')}\`` : '';
-      parts.push(`- [${box}] ${item.text}${due}${tags}`);
-      if (item.description) {
-        item.description.split('\n').forEach((line) => {
-          parts.push(`  > ${line}`);
-        });
-      }
-      (item.subItems || []).forEach((sub) => {
-        const subBox = sub.complete ? 'x' : ' ';
-        parts.push(`  - [${subBox}] ${sub.text}`);
-      });
+      parts.push(...formatItemMarkdown(item));
     });
     parts.push('');
   });
@@ -148,20 +154,7 @@ export function listToMarkdown(list) {
     return parts.join('\n');
   }
   list.items.forEach((item) => {
-    const box = item.complete ? 'x' : ' ';
-    const due = item.dueDate ? ` _(due ${item.dueDate})_` : '';
-    const tags = item.tags?.length ? ` \`${item.tags.join(', ')}\`` : '';
-    const pri = item.priority ? ` !p${item.priority}` : '';
-    parts.push(`- [${box}] ${item.text}${due}${tags}${pri}`);
-    if (item.description) {
-      item.description.split('\n').forEach((line) => {
-        parts.push(`  > ${line}`);
-      });
-    }
-    (item.subItems || []).forEach((sub) => {
-      const subBox = sub.complete ? 'x' : ' ';
-      parts.push(`  - [${subBox}] ${sub.text}`);
-    });
+    parts.push(...formatItemMarkdown(item, { includePriority: true }));
   });
   return parts.join('\n');
 }

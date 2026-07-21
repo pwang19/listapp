@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { isOverdue, isDueSoon } from '../utils/helpers';
-import { LIST_COLORS } from '../utils/constants';
+import { isOverdue, isDueSoon } from '../../utils/helpers';
+import { LIST_COLORS } from '../../utils/constants';
 
 function UpcomingView({ items, onItemClick }) {
   if (!items.length) {

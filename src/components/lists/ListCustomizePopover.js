@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { LIST_COLORS, LIST_ICONS, SORT_MODES } from '../utils/constants';
+import { LIST_COLORS, LIST_ICONS, SORT_MODES } from '../../utils/constants';
 
 const ICON_LABELS = {
   '📋': 'clipboard',

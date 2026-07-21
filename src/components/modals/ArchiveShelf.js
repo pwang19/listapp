@@ -1,9 +1,9 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import Modal from './Modal';
-import { TAG_PALETTE } from '../utils/constants';
+import { getTagById } from '../../utils/tags';
 
-function ArchiveShelf({ isOpen, onClose, archived, lists, onRestore, onPurge }) {
+function ArchiveShelf({ isOpen, onClose, archived, lists, customTags = [], onRestore, onPurge }) {
   return (
     <Modal
       isOpen={isOpen}
@@ -37,7 +37,7 @@ function ArchiveShelf({ isOpen, onClose, archived, lists, onRestore, onPurge }) 
                 {(entry.tags || []).length > 0 ? (
                   <div className="tag-row">
                     {entry.tags.map((tagId) => {
-                      const tag = TAG_PALETTE.find((t) => t.id === tagId);
+                      const tag = getTagById(tagId, customTags);
                       return tag ? (
                         <span key={tagId} className="tag-chip">
                           {tag.label}
@@ -97,6 +97,7 @@ ArchiveShelf.propTypes = {
   onClose: PropTypes.func.isRequired,
   archived: PropTypes.arrayOf(PropTypes.object).isRequired,
   lists: PropTypes.arrayOf(PropTypes.object).isRequired,
+  customTags: PropTypes.array,
   onRestore: PropTypes.func.isRequired,
   onPurge: PropTypes.func.isRequired,
 };

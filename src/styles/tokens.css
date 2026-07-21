@@ -1,0 +1,41 @@
+:root {
+  --bg-page: #1a2332;
+  --bg-page-accent: #243447;
+  --bg-card: #f4f6f8;
+  --bg-panel: #ffffff;
+  --text-on-dark: #e8eef4;
+  --text-primary: #1c2430;
+  --text-muted: #6b7785;
+  --border: #d0d7de;
+  --accent: #2f6fed;
+  --accent-hover: #2558c4;
+  --danger: #d64545;
+  --danger-hover: #b53737;
+  --success: #2f9e6b;
+  --radius: 10px;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  --font: 'Segoe UI', 'Avenir Next', 'Helvetica Neue', sans-serif;
+}
+[data-theme='dark'] {
+  --bg-page: #0f1419;
+  --bg-page-accent: #1a2332;
+  --bg-card: #1e293b;
+  --bg-panel: #1e293b;
+  --text-on-dark: #e2e8f0;
+  --text-primary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --border: #334155;
+}
+
+[data-theme='dark'] .text-input,
+[data-theme='dark'] .description-textarea,
+[data-theme='dark'] .style-select {
+  background: #0f172a;
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+[data-theme='dark'] .chip-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+}
