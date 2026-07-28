@@ -9,6 +9,7 @@ import { reorderArray } from '../utils/helpers';
 import { PRIORITY_SCALE_VERSION } from '../utils/constants';
 import { cloneList, cloneItem } from '../utils/clone';
 import { applyRecurringOnComplete } from '../utils/recurring';
+import { appendHistory, createHistoryEntry } from '../utils/itemHistory';
 import {
   loadLists,
   loadArchived,
@@ -68,15 +69,18 @@ export function listsReducer(state, action) {
         ...list,
         items: [
           ...list.items,
-          normalizeItem({
-            text: action.text,
-            complete: false,
-            description: '',
-            dueDate: action.dueDate || '',
-            tags: action.tags || [],
-            priority: action.priority || 0,
-            subItems: [],
-          }, action.customTags),
+          appendHistory(
+            normalizeItem({
+              text: action.text,
+              complete: false,
+              description: '',
+              dueDate: action.dueDate || '',
+              tags: action.tags || [],
+              priority: action.priority || 0,
+              subItems: [],
+            }, action.customTags),
+            createHistoryEntry('created')
+          ),
         ],
       }));
     case 'DUPLICATE_ITEM': {
@@ -92,13 +96,18 @@ export function listsReducer(state, action) {
       const fromList = state.find((l) => l.id === action.fromListId);
       const item = fromList?.items.find((i) => i.id === action.itemId);
       if (!item || !state.some((l) => l.id === action.toListId)) return state;
+      const toList = state.find((l) => l.id === action.toListId);
+      const movedItem = appendHistory(
+        normalizeItem(item),
+        createHistoryEntry('moved', toList?.name || '')
+      );
       return updateList(
         updateList(state, action.fromListId, (l) => ({
           ...l,
           items: l.items.filter((i) => i.id !== action.itemId),
         })),
         action.toListId,
-        (l) => ({ ...l, items: [...l.items, normalizeItem(item)] })
+        (l) => ({ ...l, items: [...l.items, movedItem] })
       );
     }
     case 'BULK_UPDATE_ITEMS':
@@ -142,34 +151,73 @@ export function listsReducer(state, action) {
         const next = { ...item, complete: !item.complete };
         if (next.complete) {
           next.completedAt = new Date().toISOString();
-          return applyRecurringOnComplete(next);
+          const recurring = applyRecurringOnComplete(next);
+          return appendHistory(recurring, createHistoryEntry('completed'));
         }
-        return { ...next, completedAt: '' };
+        return appendHistory(
+          { ...next, completedAt: '' },
+          createHistoryEntry('uncompleted')
+        );
       });
     case 'RENAME_ITEM':
-      return updateItem(state, action.listId, action.itemId, (item) => ({
-        ...item,
-        text: action.name,
-      }));
-    case 'UPDATE_ITEM':
       return updateItem(state, action.listId, action.itemId, (item) =>
-        normalizeItem({ ...item, ...action.patch }, action.customTags)
+        appendHistory(
+          { ...item, text: action.name },
+          createHistoryEntry('renamed', action.name)
+        )
       );
+    case 'UPDATE_ITEM':
+      return updateItem(state, action.listId, action.itemId, (item) => {
+        const patch = action.patch || {};
+        let entry = action.historyEntry;
+        if (!entry) {
+          if (patch.dueDate !== undefined && patch.dueDate !== item.dueDate) {
+            entry = createHistoryEntry('due_date', patch.dueDate || 'cleared');
+          } else if (patch.tags !== undefined) {
+            entry = createHistoryEntry('tagged', (patch.tags || []).join(', '));
+          } else if (patch.priority !== undefined && patch.priority !== item.priority) {
+            entry = createHistoryEntry('priority', String(patch.priority));
+          } else if (patch.recurring !== undefined && patch.recurring !== item.recurring) {
+            entry = createHistoryEntry('recurring', patch.recurring);
+          } else if (patch.description !== undefined && patch.description !== item.description) {
+            entry = createHistoryEntry('description');
+          } else if (patch.snoozedUntil !== undefined) {
+            entry = patch.snoozedUntil
+              ? createHistoryEntry('snoozed', patch.snoozedUntil)
+              : createHistoryEntry('unsnoozed');
+          }
+        }
+        const next = normalizeItem({ ...item, ...patch }, action.customTags);
+        return entry ? appendHistory(next, entry) : next;
+      });
     case 'ADD_SUB_ITEM':
-      return updateItem(state, action.listId, action.itemId, (item) => ({
-        ...item,
-        subItems: [
-          ...(item.subItems || []),
-          normalizeSubItem({ text: action.text, complete: false }),
-        ],
-      }));
+      return updateItem(state, action.listId, action.itemId, (item) =>
+        appendHistory(
+          {
+            ...item,
+            subItems: [
+              ...(item.subItems || []),
+              normalizeSubItem({ text: action.text, complete: false }),
+            ],
+          },
+          createHistoryEntry('sub_item_added', action.text)
+        )
+      );
     case 'TOGGLE_SUB_ITEM':
-      return updateItem(state, action.listId, action.itemId, (item) => ({
-        ...item,
-        subItems: (item.subItems || []).map((sub) =>
-          sub.id === action.subItemId ? { ...sub, complete: !sub.complete } : sub
-        ),
-      }));
+      return updateItem(state, action.listId, action.itemId, (item) => {
+        const sub = (item.subItems || []).find((s) => s.id === action.subItemId);
+        const nextSubItems = (item.subItems || []).map((s) =>
+          s.id === action.subItemId ? { ...s, complete: !s.complete } : s
+        );
+        const toggled = nextSubItems.find((s) => s.id === action.subItemId);
+        if (sub && toggled?.complete) {
+          return appendHistory(
+            { ...item, subItems: nextSubItems },
+            createHistoryEntry('sub_item_completed', sub.text)
+          );
+        }
+        return { ...item, subItems: nextSubItems };
+      });
     case 'DELETE_SUB_ITEM':
       return updateItem(state, action.listId, action.itemId, (item) => ({
         ...item,

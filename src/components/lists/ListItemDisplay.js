@@ -31,6 +31,8 @@ function ListItemDisplay({
   bulkSelected = false,
   onBulkToggle,
   customTags = [],
+  keyboardFocused = false,
+  itemKey = '',
 }) {
   const checkboxId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -40,6 +42,8 @@ function ListItemDisplay({
   const overdue = isOverdue(dueDate, isComplete);
   const dueSoon = isDueSoon(dueDate, isComplete);
   const pri = PRIORITIES.find((p) => p.id === priority);
+  const subCompleteCount = subItems.filter((s) => s.complete).length;
+  const subTotal = subItems.length;
 
   const handleTouchStart = (e) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -65,8 +69,9 @@ function ListItemDisplay({
 
   const body = (
     <div
-      className="list-item swipe-item"
+      className={`list-item swipe-item${keyboardFocused ? ' is-keyboard-focused' : ''}`}
       style={{ transform: offsetX ? `translateX(${offsetX}px)` : undefined }}
+      data-item-key={itemKey || undefined}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -97,6 +102,14 @@ function ListItemDisplay({
         {pri && pri.id > 0 ? (
           <span className="priority-badge" style={{ color: pri.color }} title={pri.label}>
             P{pri.id}
+          </span>
+        ) : null}
+        {subTotal > 0 ? (
+          <span
+            className={`subitem-progress${subCompleteCount === subTotal ? ' is-complete' : ''}`}
+            title={`${subCompleteCount} of ${subTotal} sub-items done`}
+          >
+            {subCompleteCount}/{subTotal}
           </span>
         ) : null}
         {dueDate ? (
@@ -173,33 +186,6 @@ function ListItemDisplay({
             </div>
           ) : null}
         </div>
-      ) : expanded && onAddSubItem ? (
-        <div className="inline-subitems-section">
-          <div className="inline-subitems">
-            <input
-              type="text"
-              className="text-input text-input--sm"
-              placeholder="Quick add sub-item…"
-              value={subInput}
-              onChange={(e) => setSubInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && subInput.trim()) {
-                  onAddSubItem(subInput.trim());
-                  setSubInput('');
-                }
-              }}
-              autoFocus
-            />
-          </div>
-        </div>
-      ) : onAddSubItem ? (
-        <button
-          type="button"
-          className="btn-link subitems-toggle"
-          onClick={() => setExpanded(true)}
-        >
-          + Add sub-item
-        </button>
       ) : null}
     </div>
   );
@@ -231,6 +217,8 @@ ListItemDisplay.propTypes = {
   bulkSelected: PropTypes.bool,
   onBulkToggle: PropTypes.func,
   customTags: PropTypes.array,
+  keyboardFocused: PropTypes.bool,
+  itemKey: PropTypes.string,
 };
 
 export default ListItemDisplay;

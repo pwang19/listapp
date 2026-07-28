@@ -79,6 +79,8 @@ function List({
   onAddCustomTag,
   onOpenItem,
   filtersActive = false,
+  focusedItemKey = '',
+  onShowStats,
 }) {
   const [inputValue, setInputValue] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -164,6 +166,9 @@ function List({
             </button>
             <button type="button" role="menuitem" onClick={() => { onFocusMode?.(); closeMenu(); }}>
               Focus this list
+            </button>
+            <button type="button" role="menuitem" onClick={() => { onShowStats?.(); closeMenu(); }}>
+              View stats
             </button>
             <button type="button" role="menuitem" onClick={() => { handleShare(); closeMenu(); }}>
               Copy share link
@@ -258,7 +263,9 @@ function List({
                   strategy={verticalListSortingStrategy}
                 >
                   <ul className="list-items">
-                    {visibleItems.map((item) => (
+                    {visibleItems.map((item) => {
+                      const itemKey = `${listId}:${item.id}`;
+                      return (
                       <li key={item.id}>
                         <ListItemDisplay
                           id={item.id}
@@ -278,9 +285,11 @@ function List({
                           onArchive={() => onDeleteItem(item.id)}
                           onSubItemToggle={(subId) => onToggleSubItem(item.id, subId)}
                           onAddSubItem={(text) => onAddSubItem(item.id, text)}
+                          keyboardFocused={focusedItemKey === itemKey}
+                          itemKey={itemKey}
                         />
                       </li>
-                    ))}
+                    );})}
                   </ul>
                 </SortableContext>
               </DndContext>
@@ -355,6 +364,8 @@ List.propTypes = {
   onAddCustomTag: PropTypes.func,
   onOpenItem: PropTypes.func,
   filtersActive: PropTypes.bool,
+  focusedItemKey: PropTypes.string,
+  onShowStats: PropTypes.func,
 };
 
 export default List;

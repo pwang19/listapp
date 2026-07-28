@@ -109,3 +109,7 @@
 .toolbar-clear {
   color: var(--text-on-dark);
 }
+
+.saved-filters-select {
+  max-width: 160px;
+}

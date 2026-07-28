@@ -53,6 +53,22 @@ export function normalizeItem(item = {}, customTags = []) {
       ? item.recurring
       : 'none';
 
+  const snoozedUntil =
+    typeof item.snoozedUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.snoozedUntil)
+      ? item.snoozedUntil
+      : '';
+  const history = Array.isArray(item.history)
+    ? item.history
+        .filter((h) => h && typeof h.type === 'string')
+        .map((h) => ({
+          id: h.id || createId(),
+          type: h.type,
+          at: typeof h.at === 'string' ? h.at : new Date().toISOString(),
+          detail: typeof h.detail === 'string' ? h.detail : '',
+        }))
+        .slice(-50)
+    : [];
+
   return {
     id: item.id || createId(),
     text: typeof item.text === 'string' ? item.text : '',
@@ -62,6 +78,8 @@ export function normalizeItem(item = {}, customTags = []) {
     tags,
     priority,
     recurring,
+    snoozedUntil,
+    history,
     createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
     completedAt: typeof item.completedAt === 'string' ? item.completedAt : '',
     subItems: Array.isArray(item.subItems)

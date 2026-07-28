@@ -162,12 +162,14 @@ export function listToMarkdown(list) {
 export function getUpcomingItems(lists, { daysAhead = 7 } = {}) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().slice(0, 10);
   const end = new Date(today);
   end.setDate(end.getDate() + daysAhead);
   const results = [];
   lists.forEach((list) => {
     list.items.forEach((item) => {
       if (!item.dueDate || item.complete) return;
+      if (item.snoozedUntil && item.snoozedUntil > todayStr) return;
       const due = new Date(`${item.dueDate}T00:00:00`);
       if (due <= end) {
         results.push({

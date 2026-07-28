@@ -14,6 +14,10 @@ function Toolbar({
   allTags,
   filtersActive,
   onClearFilters,
+  savedFilters = [],
+  onApplySavedFilter,
+  onSaveFilter,
+  onDeleteSavedFilter,
   viewMode,
   settings,
   onUpdateSettings,
@@ -66,6 +70,37 @@ function Toolbar({
           <button type="button" className="btn-link toolbar-clear" onClick={onClearFilters}>
             Clear filters
           </button>
+        ) : null}
+        {filtersActive ? (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onSaveFilter}>
+            Save view
+          </button>
+        ) : null}
+        {savedFilters.length > 0 ? (
+          <select
+            className="style-select saved-filters-select"
+            value=""
+            onChange={(e) => {
+              const id = e.target.value;
+              if (!id) return;
+              if (id.startsWith('delete:')) {
+                onDeleteSavedFilter(id.replace('delete:', ''));
+              } else {
+                onApplySavedFilter(id);
+              }
+              e.target.value = '';
+            }}
+            aria-label="Saved filter views"
+          >
+            <option value="">Saved views…</option>
+            {savedFilters.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+            <option disabled>──────────</option>
+            {savedFilters.map((f) => (
+              <option key={`del-${f.id}`} value={`delete:${f.id}`}>Delete “{f.name}”</option>
+            ))}
+          </select>
         ) : null}
       </div>
 
@@ -129,6 +164,10 @@ Toolbar.propTypes = {
   allTags: PropTypes.array.isRequired,
   filtersActive: PropTypes.bool.isRequired,
   onClearFilters: PropTypes.func.isRequired,
+  savedFilters: PropTypes.array,
+  onApplySavedFilter: PropTypes.func.isRequired,
+  onSaveFilter: PropTypes.func.isRequired,
+  onDeleteSavedFilter: PropTypes.func.isRequired,
   viewMode: PropTypes.string.isRequired,
   settings: PropTypes.object.isRequired,
   onUpdateSettings: PropTypes.func.isRequired,

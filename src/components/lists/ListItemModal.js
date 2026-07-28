@@ -20,6 +20,8 @@ import SortableRow from '../ui/SortableRow';
 import { PRIORITIES, RECURRING_OPTIONS } from '../../utils/constants';
 import { getAllTags } from '../../utils/tags';
 import { renderMarkdown } from '../../utils/helpers';
+import { SNOOZE_OPTIONS, isSnoozed } from '../../utils/snooze';
+import { formatHistoryDetail } from '../../utils/itemHistory';
 
 const subItemShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -35,6 +37,8 @@ function ListItemModal({
   tags = [],
   priority = 0,
   recurring = 'none',
+  snoozedUntil = '',
+  history = [],
   completedAt = '',
   subItems = [],
   customTags = [],
@@ -51,6 +55,8 @@ function ListItemModal({
   onDeleteSubItem,
   onReorderSubItems,
   onAddCustomTag,
+  onSnooze,
+  onClearSnooze,
 }) {
   const [descriptionValue, setDescriptionValue] = useState(description || '');
   const [dueDateValue, setDueDateValue] = useState(dueDate || '');
@@ -62,6 +68,7 @@ function ListItemModal({
   const [previewMarkdown, setPreviewMarkdown] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [savedHint, setSavedHint] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const descId = useId();
   const dueId = useId();
   const subInputId = useId();
@@ -256,6 +263,33 @@ function ListItemModal({
           </div>
         </div>
 
+        {!completedAt && onSnooze ? (
+          <div className="field">
+            <span className="field-label">Snooze</span>
+            {isSnoozed(snoozedUntil) ? (
+              <p className="snooze-active-hint">
+                Snoozed until {snoozedUntil}
+                <button type="button" className="btn-link" onClick={onClearSnooze}>
+                  Clear snooze
+                </button>
+              </p>
+            ) : (
+              <div className="snooze-options">
+                {SNOOZE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => onSnooze(opt.days)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+
         <div className="field">
           <span className="field-label">Tags</span>
           <div className="tag-picker">
@@ -292,6 +326,31 @@ function ListItemModal({
             </button>
           </div>
         </div>
+
+        {history.length > 0 ? (
+          <div className="field">
+            <button
+              type="button"
+              className="btn-link history-toggle"
+              onClick={() => setHistoryOpen((v) => !v)}
+              aria-expanded={historyOpen}
+            >
+              {historyOpen ? '▾' : '▸'} Activity ({history.length})
+            </button>
+            {historyOpen ? (
+              <ul className="item-history-list">
+                {[...history].reverse().map((entry) => (
+                  <li key={entry.id} className="item-history-entry">
+                    <span className="item-history-detail">{formatHistoryDetail(entry)}</span>
+                    <time className="item-history-time" dateTime={entry.at}>
+                      {new Date(entry.at).toLocaleString()}
+                    </time>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="field">
           <span className="field-label" id={`${subInputId}-label`}>Sub-items</span>
@@ -396,6 +455,8 @@ ListItemModal.propTypes = {
   tags: PropTypes.arrayOf(PropTypes.string),
   priority: PropTypes.number,
   recurring: PropTypes.string,
+  snoozedUntil: PropTypes.string,
+  history: PropTypes.array,
   completedAt: PropTypes.string,
   subItems: PropTypes.arrayOf(subItemShape),
   customTags: PropTypes.array,
@@ -412,6 +473,8 @@ ListItemModal.propTypes = {
   onDeleteSubItem: PropTypes.func.isRequired,
   onReorderSubItems: PropTypes.func.isRequired,
   onAddCustomTag: PropTypes.func,
+  onSnooze: PropTypes.func,
+  onClearSnooze: PropTypes.func,
 };
 
 export default ListItemModal;

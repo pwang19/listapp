@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { isOverdue, isDueSoon } from '../../utils/helpers';
 import { LIST_COLORS } from '../../utils/constants';
 
-function UpcomingView({ items, onItemClick }) {
+function UpcomingView({ items, onItemClick, focusedItemKey }) {
   if (!items.length) {
     return (
       <p className="empty-state">
@@ -24,11 +24,12 @@ function UpcomingView({ items, onItemClick }) {
         <ul className="upcoming-list">
           {rows.map(({ listId, listName, listIcon, item }) => {
             const colorMeta = LIST_COLORS.find((c) => c.id === item.listColor) || LIST_COLORS[0];
+            const focusKey = `${listId}:${item.id}`;
             return (
-              <li key={`${listId}-${item.id}`}>
+              <li key={`${listId}-${item.id}`} data-item-key={focusKey}>
                 <button
                   type="button"
-                  className="upcoming-row"
+                  className={`upcoming-row${focusedItemKey === focusKey ? ' is-keyboard-focused' : ''}`}
                   onClick={() => onItemClick(listId, item.id)}
                 >
                   <span className="upcoming-list-label">
@@ -61,6 +62,7 @@ function UpcomingView({ items, onItemClick }) {
 UpcomingView.propTypes = {
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
   onItemClick: PropTypes.func.isRequired,
+  focusedItemKey: PropTypes.string,
 };
 
 export default UpcomingView;

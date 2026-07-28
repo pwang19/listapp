@@ -10,6 +10,8 @@
  * @property {string[]} tags
  * @property {number} priority
  * @property {string} recurring
+ * @property {string} snoozedUntil
+ * @property {{ id: string; type: string; at: string; detail: string }[]} history
  * @property {string} createdAt
  * @property {string} completedAt
  * @property {SubItem[]} subItems
@@ -45,6 +47,7 @@
  * @property {string} viewMode
  * @property {string} lastUsedListId
  * @property {string} kanbanGroupBy
+ * @property {{ id: string; name: string; searchQuery: string; itemFilter: string; tagFilter: string }[]} savedFilters
  */
 
 export {};

@@ -78,6 +78,7 @@ const DEFAULT_SETTINGS = {
   lastUsedListId: '',
   kanbanGroupBy: 'status',
   priorityScaleVersion: 1,
+  savedFilters: [],
 };
 
 export function loadSettings() {

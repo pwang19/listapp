@@ -4,7 +4,15 @@ import { getTagById } from '../../utils/tags';
 import { isOverdue, isDueSoon } from '../../utils/helpers';
 import { LIST_COLORS, PRIORITIES } from '../../utils/constants';
 
-function AllItemsView({ rows, customTags, onItemClick, bulkMode, selectedIds, onToggleSelect }) {
+function AllItemsView({
+  rows,
+  customTags,
+  onItemClick,
+  bulkMode,
+  selectedIds,
+  onToggleSelect,
+  focusedItemKey,
+}) {
   if (!rows.length) {
     return <p className="empty-state">No items yet. Add items to your lists.</p>;
   }
@@ -28,8 +36,13 @@ function AllItemsView({ rows, customTags, onItemClick, bulkMode, selectedIds, on
             const colorMeta = LIST_COLORS.find((c) => c.id === listColor) || LIST_COLORS[0];
             const pri = PRIORITIES.find((p) => p.id === (item.priority || 0));
             const rowKey = `${listId}-${item.id}`;
+            const focusKey = `${listId}:${item.id}`;
             return (
-              <tr key={rowKey} className={item.complete ? 'is-complete' : ''}>
+              <tr
+                key={rowKey}
+                className={`${item.complete ? 'is-complete' : ''}${focusedItemKey === focusKey ? ' is-keyboard-focused' : ''}`}
+                data-item-key={focusKey}
+              >
                 {bulkMode ? (
                   <td>
                     <input
@@ -98,6 +111,7 @@ AllItemsView.propTypes = {
   bulkMode: PropTypes.bool,
   selectedIds: PropTypes.instanceOf(Set),
   onToggleSelect: PropTypes.func,
+  focusedItemKey: PropTypes.string,
 };
 
 export default AllItemsView;

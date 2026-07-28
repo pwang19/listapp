@@ -415,6 +415,28 @@
   margin: 0 0 0.5rem;
 }
 
+.subitem-progress {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: #f3f4f6;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.subitem-progress.is-complete {
+  color: var(--success, #16a34a);
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.list-item.is-keyboard-focused,
+.kanban-card.is-keyboard-focused,
+.upcoming-row.is-keyboard-focused,
+.all-items-table tr.is-keyboard-focused {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .subitems-toggle {
   margin: 0.25rem 0 0 1.75rem;
   font-size: 0.8rem;

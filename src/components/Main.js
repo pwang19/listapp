@@ -28,6 +28,12 @@ import { sortListsForDisplay } from '../utils/sortItems';
 import { getUpcomingItems, flattenAllItems } from '../utils/helpers';
 import { decodeListFromHash } from '../utils/shareLink';
 import { normalizeList } from '../utils/normalizeLists';
+import BulkTagModal from './modals/BulkTagModal';
+import ListStatsModal from './modals/ListStatsModal';
+import SaveFilterModal from './modals/SaveFilterModal';
+import { buildNavigableItems } from '../utils/keyboardNav';
+import { createId } from '../utils/ids';
+import { buildSnoozePatch } from '../utils/snooze';
 
 function Main() {
   const {
@@ -97,6 +103,10 @@ function Main() {
   const [pendingShareList, setPendingShareList] = useState(null);
   const [activeDragId, setActiveDragId] = useState(null);
   const [modalTarget, setModalTarget] = useState(null);
+  const [bulkTagModalOpen, setBulkTagModalOpen] = useState(false);
+  const [saveFilterModalOpen, setSaveFilterModalOpen] = useState(false);
+  const [statsListId, setStatsListId] = useState(null);
+  const [focusedItemKey, setFocusedItemKey] = useState('');
 
   const searchRef = useRef(null);
   const newListRef = useRef(null);
@@ -113,7 +123,8 @@ function Main() {
 
   const anyModalOpen =
     deleteModalOpen || importExportModalOpen || archiveOpen || templatesOpen ||
-    printOpen || helpOpen || commandOpen || shareImportOpen || Boolean(modalTarget);
+    printOpen || helpOpen || commandOpen || shareImportOpen || bulkTagModalOpen ||
+    saveFilterModalOpen || Boolean(statsListId) || Boolean(modalTarget);
 
   const listsToShow = useMemo(() => {
     const filtered = lists.filter((list) =>
@@ -136,6 +147,24 @@ function Main() {
     () => filterItemRows(flattenAllItems(lists), { itemFilter, searchQuery, tagFilter }),
     [lists, itemFilter, tagFilter, searchQuery]
   );
+
+  const navigableItems = useMemo(
+    () =>
+      buildNavigableItems({
+        viewMode,
+        lists,
+        listsToShow,
+        allItemRows,
+        upcomingItems,
+        itemFilter,
+        searchQuery,
+        tagFilter,
+      }),
+    [viewMode, lists, listsToShow, allItemRows, upcomingItems, itemFilter, searchQuery, tagFilter]
+  );
+
+  const savedFilters = settings.savedFilters || [];
+  const statsList = statsListId ? lists.find((l) => l.id === statsListId) : null;
 
   const openItemModal = useCallback((listId, itemId) => {
     setModalTarget({ listId, itemId });
@@ -239,6 +268,53 @@ function Main() {
     announce('Filters cleared');
   };
 
+  const applySavedFilter = useCallback((filterId) => {
+    const filter = savedFilters.find((f) => f.id === filterId);
+    if (!filter) return;
+    setSearchQuery(filter.searchQuery || '');
+    setItemFilter(filter.itemFilter || 'all');
+    setTagFilter(filter.tagFilter || '');
+    announce(`Applied view “${filter.name}”`);
+  }, [savedFilters]);
+
+  const handleSaveFilter = useCallback((name) => {
+    const entry = {
+      id: createId(),
+      name,
+      searchQuery,
+      itemFilter,
+      tagFilter,
+    };
+    updateSettings({ savedFilters: [...savedFilters, entry] });
+    announce(`Saved view “${name}”`);
+  }, [savedFilters, searchQuery, itemFilter, tagFilter, updateSettings]);
+
+  const deleteSavedFilter = useCallback((filterId) => {
+    updateSettings({ savedFilters: savedFilters.filter((f) => f.id !== filterId) });
+    announce('Saved view deleted');
+  }, [savedFilters, updateSettings]);
+
+  const focusNavItem = useCallback((key) => {
+    setFocusedItemKey(key);
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-item-key="${key}"]`)?.scrollIntoView({ block: 'nearest' });
+    });
+  }, []);
+
+  const navigateItems = useCallback((direction) => {
+    if (!navigableItems.length) return;
+    const currentIndex = navigableItems.findIndex((item) => item.key === focusedItemKey);
+    let nextIndex;
+    if (currentIndex < 0) {
+      nextIndex = direction > 0 ? 0 : navigableItems.length - 1;
+    } else {
+      nextIndex = currentIndex + direction;
+      if (nextIndex < 0) nextIndex = navigableItems.length - 1;
+      if (nextIndex >= navigableItems.length) nextIndex = 0;
+    }
+    focusNavItem(navigableItems[nextIndex].key);
+  }, [navigableItems, focusedItemKey, focusNavItem]);
+
   const toggleBulkSelect = (listId, itemId) => {
     setBulkSelected((prev) => {
       const next = new Map(prev);
@@ -283,26 +359,61 @@ function Main() {
   };
 
   const handleBulkAddTag = () => {
-    const tag = window.prompt('Tag name to add:');
-    if (!tag) return;
-    const created = addCustomTag(tag);
-    const tagId = created?.id || tag.toLowerCase();
+    setBulkTagModalOpen(true);
+  };
+
+  const handleBulkTagConfirm = (tagIds) => {
     bulkByList.forEach((itemIds, listId) => {
       itemIds.forEach((itemId) => {
         const list = lists.find((l) => l.id === listId);
         const item = list?.items.find((i) => i.id === itemId);
         if (item) {
-          const tags = [...new Set([...(item.tags || []), tagId])];
+          const tags = [...new Set([...(item.tags || []), ...tagIds])];
           updateItemFields(listId, itemId, { tags });
         }
       });
     });
     setBulkSelected(new Map());
+    announce('Tags added');
   };
+
+  const handleKanbanColumnDrop = useCallback((listId, itemId, columnId, groupBy) => {
+    const list = lists.find((l) => l.id === listId);
+    const item = list?.items.find((i) => i.id === itemId);
+    if (!item) return;
+
+    if (groupBy === 'status') {
+      const shouldComplete = columnId === 'completed';
+      if (item.complete !== shouldComplete) toggleItem(listId, itemId);
+      return;
+    }
+
+    if (columnId === '_none') {
+      updateItemFields(listId, itemId, { tags: [] });
+    } else {
+      updateItemFields(listId, itemId, { tags: [columnId] });
+    }
+    announce('Item updated');
+  }, [lists, toggleItem, updateItemFields]);
+
+  const handleSnoozeItem = useCallback((days) => {
+    if (!modalTarget) return;
+    const list = lists.find((l) => l.id === modalTarget.listId);
+    const item = list?.items.find((i) => i.id === modalTarget.itemId);
+    if (!item) return;
+    updateItemFields(modalTarget.listId, modalTarget.itemId, buildSnoozePatch(item, days));
+    announce('Item snoozed');
+  }, [modalTarget, lists, updateItemFields]);
+
+  const handleClearSnooze = useCallback(() => {
+    if (!modalTarget) return;
+    updateItemFields(modalTarget.listId, modalTarget.itemId, { snoozedUntil: '' });
+    announce('Snooze cleared');
+  }, [modalTarget, updateItemFields]);
 
   const commands = useMemo(() => [
     { id: 'search', label: 'Focus search', shortcut: '/', action: () => searchRef.current?.focus() },
-    { id: 'new-list', label: 'New list', shortcut: 'n', action: () => newListRef.current?.focus() },
+    ...(viewMode === 'grid' ? [{ id: 'new-list', label: 'New list', shortcut: 'n', action: () => newListRef.current?.focus() }] : []),
     { id: 'templates', label: 'Templates', shortcut: 't', keywords: 'template', action: () => setTemplatesOpen(true) },
     { id: 'archive', label: 'Archived items', shortcut: 'a', action: () => setArchiveOpen(true) },
     { id: 'import', label: 'Import / Export', keywords: 'backup export', action: () => setImportExportModalOpen(true) },
@@ -312,13 +423,19 @@ function Main() {
     { id: 'view-kanban', label: 'Kanban view', action: () => updateSettings({ viewMode: 'kanban' }) },
     { id: 'view-upcoming', label: 'Upcoming / overdue', action: () => updateSettings({ viewMode: 'upcoming' }) },
     { id: 'bulk', label: 'Toggle bulk select', keywords: 'multi select', action: () => setBulkMode((v) => !v) },
+    ...savedFilters.map((f) => ({
+      id: `filter-${f.id}`,
+      label: `Apply view: ${f.name}`,
+      keywords: 'filter saved view',
+      action: () => applySavedFilter(f.id),
+    })),
     { id: 'dark', label: 'Toggle dark mode', action: () => {
       const next = settings.darkMode === 'dark' ? 'light' : 'dark';
       updateSettings({ darkMode: next });
     }},
     { id: 'focus-clear', label: 'Exit focus mode', action: () => updateSettings({ focusListId: '' }) },
     { id: 'help', label: 'Keyboard shortcuts', shortcut: '?', action: () => setHelpOpen(true) },
-  ], [exportBackup, updateSettings, settings.darkMode]);
+  ], [exportBackup, updateSettings, settings.darkMode, viewMode, savedFilters, applySavedFilter]);
 
   const onGlobalKeyDown = useCallback(
     (event) => {
@@ -347,10 +464,35 @@ function Main() {
 
       if (isTypingTarget(event.target)) return;
 
+      const focused = navigableItems.find((item) => item.key === focusedItemKey);
+
+      if (event.key === 'j') {
+        event.preventDefault();
+        navigateItems(1);
+        return;
+      }
+      if (event.key === 'k') {
+        event.preventDefault();
+        navigateItems(-1);
+        return;
+      }
+      if (focused && event.key === 'x') {
+        event.preventDefault();
+        toggleItem(focused.listId, focused.itemId);
+        return;
+      }
+      if (focused && (event.key === 'e' || event.key === 'Enter')) {
+        event.preventDefault();
+        openItemModal(focused.listId, focused.itemId);
+        return;
+      }
+
       switch (event.key) {
         case 'n':
-          event.preventDefault();
-          newListRef.current?.focus();
+          if (viewMode === 'grid') {
+            event.preventDefault();
+            newListRef.current?.focus();
+          }
           break;
         case '?':
           event.preventDefault();
@@ -371,7 +513,8 @@ function Main() {
           break;
       }
     },
-    [anyModalOpen, commandOpen, undoStack.length, redoStack.length, applyUndo, applyRedo]
+    [anyModalOpen, commandOpen, undoStack.length, redoStack.length, applyUndo, applyRedo, viewMode,
+      navigableItems, focusedItemKey, navigateItems, toggleItem, openItemModal]
   );
 
   useEffect(() => {
@@ -431,6 +574,10 @@ function Main() {
         allTags={allTags}
         filtersActive={filtersActive}
         onClearFilters={clearFilters}
+        savedFilters={savedFilters}
+        onApplySavedFilter={applySavedFilter}
+        onSaveFilter={() => setSaveFilterModalOpen(true)}
+        onDeleteSavedFilter={deleteSavedFilter}
         viewMode={viewMode}
         settings={settings}
         onUpdateSettings={updateSettings}
@@ -497,10 +644,16 @@ function Main() {
           onSetListMeta={setListMeta}
           onAddCustomTag={addCustomTag}
           onRenameList={renameList}
+          focusedItemKey={focusedItemKey}
+          onShowStats={setStatsListId}
         />
       ) : null}
       {viewMode === 'upcoming' ? (
-        <UpcomingView items={upcomingItems} onItemClick={openItemModal} />
+        <UpcomingView
+          items={upcomingItems}
+          onItemClick={openItemModal}
+          focusedItemKey={focusedItemKey}
+        />
       ) : null}
       {viewMode === 'all' ? (
         <AllItemsView
@@ -510,6 +663,7 @@ function Main() {
           bulkMode={bulkMode}
           selectedIds={new Set([...bulkSelected.keys()])}
           onToggleSelect={(key, listId, itemId) => toggleBulkSelect(listId, itemId)}
+          focusedItemKey={focusedItemKey}
         />
       ) : null}
       {viewMode === 'kanban' ? (
@@ -532,6 +686,8 @@ function Main() {
             customTags={customTags}
             groupBy={settings.kanbanGroupBy || 'status'}
             onItemClick={openItemModal}
+            onColumnDrop={handleKanbanColumnDrop}
+            focusedItemKey={focusedItemKey}
           />
         </>
       ) : null}
@@ -542,18 +698,20 @@ function Main() {
         </button>
       ) : null}
 
-      <div className="main-controls">
-        <input
-          ref={newListRef}
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Add a new list… (n)"
-          aria-label="Add a new list"
-          className="text-input text-input--wide"
-        />
-      </div>
+      {viewMode === 'grid' ? (
+        <div className="main-controls">
+          <input
+            ref={newListRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Add a new list… (n)"
+            aria-label="Add a new list"
+            className="text-input text-input--wide"
+          />
+        </div>
+      ) : null}
 
       <ConfirmModal
         isOpen={deleteModalOpen}
@@ -593,6 +751,27 @@ function Main() {
 
       <CommandPalette isOpen={commandOpen} onClose={() => setCommandOpen(false)} commands={commands} />
 
+      <BulkTagModal
+        isOpen={bulkTagModalOpen}
+        selectedCount={bulkSelected.size}
+        customTags={customTags}
+        onClose={() => setBulkTagModalOpen(false)}
+        onConfirm={handleBulkTagConfirm}
+        onAddCustomTag={addCustomTag}
+      />
+
+      <SaveFilterModal
+        isOpen={saveFilterModalOpen}
+        onClose={() => setSaveFilterModalOpen(false)}
+        onSave={handleSaveFilter}
+      />
+
+      <ListStatsModal
+        isOpen={Boolean(statsListId)}
+        list={statsList}
+        onClose={() => setStatsListId(null)}
+      />
+
       {modalTarget && modalItem ? (
         <ListItemModal
           isOpen
@@ -602,6 +781,8 @@ function Main() {
           tags={modalItem.tags || []}
           priority={modalItem.priority || 0}
           recurring={modalItem.recurring || 'none'}
+          snoozedUntil={modalItem.snoozedUntil || ''}
+          history={modalItem.history || []}
           completedAt={modalItem.completedAt || ''}
           subItems={modalItem.subItems || []}
           customTags={customTags}
@@ -618,6 +799,8 @@ function Main() {
           onDeleteSubItem={(subId) => deleteSubItem(modalTarget.listId, modalItem.id, subId)}
           onReorderSubItems={(a, o) => reorderSubItems(modalTarget.listId, modalItem.id, a, o)}
           onAddCustomTag={addCustomTag}
+          onSnooze={handleSnoozeItem}
+          onClearSnooze={handleClearSnooze}
         />
       ) : null}
 
@@ -625,6 +808,7 @@ function Main() {
         isOpen={helpOpen}
         message={`Keyboard shortcuts:
 / search · n new list · t templates · a archived · z undo
+j/k navigate items · x complete · e/Enter open details
 ⌘Z undo · ⌘⇧Z redo · ⌘K command palette
 Click item names for details. Drag ⋮⋮ handles to reorder.
 Quick add: Buy milk #errand !2026-07-25 !p2

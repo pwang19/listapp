@@ -53,6 +53,8 @@ function GridView({
   onSetListMeta,
   onAddCustomTag,
   onRenameList,
+  focusedItemKey,
+  onShowStats,
 }) {
   if (listsToShow.length === 0) {
     return (
@@ -131,6 +133,8 @@ function GridView({
                 onSetListMeta={(patch) => onSetListMeta(list.id, patch)}
                 onAddCustomTag={onAddCustomTag}
                 onOpenItem={(itemId) => onOpenItem(list.id, itemId)}
+                focusedItemKey={focusedItemKey}
+                onShowStats={() => onShowStats(list.id)}
               />
             </SortableRow>
           ))}
@@ -184,6 +188,8 @@ GridView.propTypes = {
   onSetListMeta: PropTypes.func.isRequired,
   onAddCustomTag: PropTypes.func.isRequired,
   onRenameList: PropTypes.func.isRequired,
+  focusedItemKey: PropTypes.string,
+  onShowStats: PropTypes.func.isRequired,
 };
 
 export default GridView;
