@@ -22,6 +22,8 @@ import { getAllTags } from '../../utils/tags';
 import { renderMarkdown } from '../../utils/helpers';
 import { SNOOZE_OPTIONS, isSnoozed } from '../../utils/snooze';
 import { formatHistoryDetail } from '../../utils/itemHistory';
+import ItemExtendedFields from './ItemExtendedFields';
+import { linkifyListMentions } from '../../utils/noteLinks';
 
 const subItemShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -57,6 +59,16 @@ function ListItemModal({
   onAddCustomTag,
   onSnooze,
   onClearSnooze,
+  estimateMinutes = 0,
+  blockedBy = [],
+  recurringIntervalDays = 0,
+  recurringEndDate = '',
+  customFieldValues = {},
+  listCustomFields = [],
+  currentItemId,
+  onSkipRecurring,
+  onSaveAsTemplate,
+  onNavigateToList,
 }) {
   const [descriptionValue, setDescriptionValue] = useState(description || '');
   const [dueDateValue, setDueDateValue] = useState(dueDate || '');
@@ -198,7 +210,13 @@ function ListItemModal({
           {previewMarkdown ? (
             <div
               className="markdown-preview"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(descriptionValue) }}
+              onClick={(e) => {
+                const btn = e.target.closest('[data-list-id]');
+                if (btn && onNavigateToList) onNavigateToList(btn.dataset.listId);
+              }}
+              dangerouslySetInnerHTML={{
+                __html: linkifyListMentions(descriptionValue, lists).replace(/\n/g, '<br/>'),
+              }}
             />
           ) : (
             <textarea
@@ -208,7 +226,7 @@ function ListItemModal({
                 setDescriptionValue(e.target.value);
                 autoSave({ description: e.target.value });
               }}
-              placeholder="Add notes… supports **bold**, lists, links"
+              placeholder="Add notes… supports **bold**, @ListName links"
               className="description-textarea"
             />
           )}
@@ -326,6 +344,22 @@ function ListItemModal({
             </button>
           </div>
         </div>
+
+        <ItemExtendedFields
+          estimateMinutes={estimateMinutes}
+          blockedBy={blockedBy}
+          recurring={recurringValue}
+          recurringIntervalDays={recurringIntervalDays}
+          recurringEndDate={recurringEndDate}
+          customFieldValues={customFieldValues}
+          listCustomFields={listCustomFields}
+          lists={lists}
+          currentListId={currentListId}
+          currentItemId={currentItemId}
+          onSave={autoSave}
+          onSkipRecurring={onSkipRecurring}
+          onSaveAsTemplate={onSaveAsTemplate}
+        />
 
         {history.length > 0 ? (
           <div className="field">

@@ -1,7 +1,10 @@
+import { parseEstimateToken } from './estimates';
+
 const DATE_RE = /^(\d{4}-\d{2}-\d{2})$/;
 const TAG_RE = /#([a-zA-Z0-9_-]+)/g;
 const PRIORITY_RE = /!(p?[123]|high|medium|low)\b/i;
 const DUE_RE = /!(\d{4}-\d{2}-\d{2})\b/;
+const ESTIMATE_RE = /~(\d+)\s*(m|h|min|hr|hours?)?\b/i;
 
 const PRIORITY_MAP = { p1: 1, p2: 2, p3: 3, high: 1, medium: 2, low: 3, 1: 1, 2: 2, 3: 3 };
 
@@ -30,8 +33,15 @@ export function parseQuickAdd(input) {
     text = text.replace(PRIORITY_RE, '').trim();
   }
 
+  let estimateMinutes = 0;
+  const estMatch = text.match(ESTIMATE_RE);
+  if (estMatch) {
+    estimateMinutes = parseEstimateToken(`${estMatch[1]}${estMatch[2] || 'm'}`);
+    text = text.replace(ESTIMATE_RE, '').trim();
+  }
+
   text = text.replace(/\s+/g, ' ').trim();
-  return { text, tags, dueDate, priority };
+  return { text, tags, dueDate, priority, estimateMinutes };
 }
 
 export function isValidDateString(s) {

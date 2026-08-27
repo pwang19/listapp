@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { getTagById } from '../../utils/tags';
 import { isOverdue, isDueSoon } from '../../utils/helpers';
 import { PRIORITIES } from '../../utils/constants';
+import { formatEstimate } from '../../utils/estimates';
 import SortableRow from '../ui/SortableRow';
 
 const subItemShape = PropTypes.shape({
@@ -33,6 +34,9 @@ function ListItemDisplay({
   customTags = [],
   keyboardFocused = false,
   itemKey = '',
+  estimateMinutes = 0,
+  isBlocked = false,
+  isStale = false,
 }) {
   const checkboxId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -103,6 +107,15 @@ function ListItemDisplay({
           <span className="priority-badge" style={{ color: pri.color }} title={pri.label}>
             P{pri.id}
           </span>
+        ) : null}
+        {estimateMinutes > 0 ? (
+          <span className="estimate-badge" title="Time estimate">{formatEstimate(estimateMinutes)}</span>
+        ) : null}
+        {isBlocked ? (
+          <span className="blocked-badge" title="Blocked">🔒</span>
+        ) : null}
+        {isStale ? (
+          <span className="stale-badge" title="Stale item">💤</span>
         ) : null}
         {subTotal > 0 ? (
           <span
@@ -219,6 +232,9 @@ ListItemDisplay.propTypes = {
   customTags: PropTypes.array,
   keyboardFocused: PropTypes.bool,
   itemKey: PropTypes.string,
+  estimateMinutes: PropTypes.number,
+  isBlocked: PropTypes.bool,
+  isStale: PropTypes.bool,
 };
 
 export default ListItemDisplay;

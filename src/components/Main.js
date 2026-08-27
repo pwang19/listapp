@@ -18,6 +18,7 @@ import PrintShareModal from './modals/PrintShareModal';
 import UpcomingView from './views/UpcomingView';
 import AllItemsView from './views/AllItemsView';
 import KanbanView from './views/KanbanView';
+import CalendarView from './views/CalendarView';
 import CommandPalette from './ui/CommandPalette';
 import BulkActionBar from './ui/BulkActionBar';
 import LiveRegion from './ui/LiveRegion';
@@ -31,9 +32,15 @@ import { normalizeList } from '../utils/normalizeLists';
 import BulkTagModal from './modals/BulkTagModal';
 import ListStatsModal from './modals/ListStatsModal';
 import SaveFilterModal from './modals/SaveFilterModal';
+import QuickCaptureModal from './modals/QuickCaptureModal';
+import ReviewModal from './modals/ReviewModal';
+import ItemTemplatesModal from './modals/ItemTemplatesModal';
+import TagManagerModal from './modals/TagManagerModal';
+import FocusTimer from './ui/FocusTimer';
 import { buildNavigableItems } from '../utils/keyboardNav';
 import { createId } from '../utils/ids';
-import { buildSnoozePatch } from '../utils/snooze';
+import { buildSnoozePatch, todayDateString } from '../utils/snooze';
+import { isItemBlocked } from '../utils/dependencies';
 
 function Main() {
   const {
@@ -41,6 +48,7 @@ function Main() {
     archived,
     customTags,
     userTemplates,
+    itemTemplates,
     settings,
     undoStack,
     redoStack,
@@ -52,7 +60,11 @@ function Main() {
     dismissToast,
     updateSettings,
     addCustomTag,
+    updateCustomTag,
+    deleteCustomTag,
     addList,
+    addFolder,
+    captureToInbox,
     duplicateList,
     saveListAsTemplate,
     addTemplate,
@@ -62,12 +74,17 @@ function Main() {
     deleteList,
     reorderLists,
     addItem,
+    addItems,
     duplicateItem,
     moveItem,
     bulkUpdateItems,
     bulkMoveItems,
     bulkArchiveItems,
     toggleItem,
+    skipRecurring,
+    saveItemAsTemplate,
+    addItemFromTemplate,
+    deleteItemTemplate,
     renameItem,
     updateItemFields,
     addSubItem,
@@ -107,6 +124,10 @@ function Main() {
   const [saveFilterModalOpen, setSaveFilterModalOpen] = useState(false);
   const [statsListId, setStatsListId] = useState(null);
   const [focusedItemKey, setFocusedItemKey] = useState('');
+  const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [itemTemplatesOpen, setItemTemplatesOpen] = useState(false);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
   const searchRef = useRef(null);
   const newListRef = useRef(null);
@@ -124,24 +145,48 @@ function Main() {
   const anyModalOpen =
     deleteModalOpen || importExportModalOpen || archiveOpen || templatesOpen ||
     printOpen || helpOpen || commandOpen || shareImportOpen || bulkTagModalOpen ||
-    saveFilterModalOpen || Boolean(statsListId) || Boolean(modalTarget);
+    saveFilterModalOpen || Boolean(statsListId) || quickCaptureOpen || reviewOpen ||
+    itemTemplatesOpen || tagManagerOpen || Boolean(modalTarget);
+
+  const matchingLists = useMemo(
+    () => lists.filter((list) => listMatchesFilters(list, { searchQuery, tagFilter, itemFilter })),
+    [lists, searchQuery, tagFilter, itemFilter]
+  );
 
   const listsToShow = useMemo(() => {
-    const filtered = lists.filter((list) =>
-      listMatchesFilters(list, { searchQuery, tagFilter, itemFilter })
-    );
     const pinned = settings.pinnedListIds || [];
-    let sorted = sortListsForDisplay(filtered, { pinnedIds: pinned });
+    let sorted = sortListsForDisplay(
+      matchingLists.filter((l) => l.isFolder || !l.parentId),
+      { pinnedIds: pinned }
+    );
     if (settings.focusListId) {
       sorted = sorted.filter((l) => l.id === settings.focusListId);
     }
     return sorted;
-  }, [lists, searchQuery, tagFilter, itemFilter, settings.pinnedListIds, settings.focusListId]);
+  }, [matchingLists, settings.pinnedListIds, settings.focusListId]);
 
   const upcomingItems = useMemo(
     () => getUpcomingItems(lists).map((r) => ({ ...r, item: { ...r.item, listColor: lists.find((l) => l.id === r.listId)?.color } })),
     [lists]
   );
+
+  const blockedItems = useMemo(() => {
+    const rows = [];
+    lists.forEach((list) => {
+      if (list.isFolder) return;
+      (list.items || []).forEach((item) => {
+        if (isItemBlocked(lists, item)) {
+          rows.push({
+            listId: list.id,
+            listName: list.name,
+            listIcon: list.icon,
+            item: { ...item, listColor: list.color },
+          });
+        }
+      });
+    });
+    return rows;
+  }, [lists]);
 
   const allItemRows = useMemo(
     () => filterItemRows(flattenAllItems(lists), { itemFilter, searchQuery, tagFilter }),
@@ -165,6 +210,45 @@ function Main() {
 
   const savedFilters = settings.savedFilters || [];
   const statsList = statsListId ? lists.find((l) => l.id === statsListId) : null;
+
+  const inboxList = lists.find((l) => l.id === settings.inboxListId) ||
+    lists.find((l) => l.name.toLowerCase() === 'inbox');
+
+  const handleToggleItem = useCallback((listId, itemId) => {
+    const ok = toggleItem(listId, itemId);
+    if (!ok) announce('Item is blocked by incomplete dependencies');
+    return ok;
+  }, [toggleItem]);
+
+  const handleToggleFolder = useCallback((folderId) => {
+    const expanded = new Set(settings.expandedFolderIds || []);
+    if (expanded.has(folderId)) expanded.delete(folderId);
+    else expanded.add(folderId);
+    updateSettings({ expandedFolderIds: [...expanded] });
+  }, [settings.expandedFolderIds, updateSettings]);
+
+  useEffect(() => {
+    if (!settings.notificationsEnabled || !('Notification' in window)) return;
+    if (Notification.permission === 'default') Notification.requestPermission();
+  }, [settings.notificationsEnabled]);
+
+  const [pomodoroRemaining, setPomodoroRemaining] = useState(0);
+  const [pomodoroRunning, setPomodoroRunning] = useState(false);
+
+  useEffect(() => {
+    if (!pomodoroRunning || pomodoroRemaining <= 0) return undefined;
+    const id = setTimeout(() => {
+      setPomodoroRemaining((value) => {
+        if (value <= 1) {
+          setPomodoroRunning(false);
+          announce('Focus session complete');
+          return 0;
+        }
+        return value - 1;
+      });
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [pomodoroRunning, pomodoroRemaining]);
 
   const openItemModal = useCallback((listId, itemId) => {
     setModalTarget({ listId, itemId });
@@ -199,6 +283,11 @@ function Main() {
     }
     return undefined;
   }, [settings.darkMode]);
+
+  useEffect(() => {
+    const density = settings.density || 'comfortable';
+    document.documentElement.setAttribute('data-density', density);
+  }, [settings.density]);
 
   useEffect(() => {
     const onDragOver = (e) => {
@@ -422,6 +511,24 @@ function Main() {
     { id: 'view-all', label: 'All items view', action: () => updateSettings({ viewMode: 'all' }) },
     { id: 'view-kanban', label: 'Kanban view', action: () => updateSettings({ viewMode: 'kanban' }) },
     { id: 'view-upcoming', label: 'Upcoming / overdue', action: () => updateSettings({ viewMode: 'upcoming' }) },
+    { id: 'view-calendar', label: 'Calendar view', action: () => updateSettings({ viewMode: 'calendar' }) },
+    { id: 'capture', label: 'Quick capture to inbox', keywords: 'inbox gtd', action: () => setQuickCaptureOpen(true) },
+    { id: 'review', label: 'Weekly review', keywords: 'overdue stale', action: () => setReviewOpen(true) },
+    { id: 'item-templates', label: 'Item templates', action: () => setItemTemplatesOpen(true) },
+    { id: 'new-folder', label: 'New folder', action: () => addFolder('New folder') },
+    { id: 'notifications', label: settings.notificationsEnabled ? 'Disable notifications' : 'Enable notifications', action: () => {
+      updateSettings({ notificationsEnabled: !settings.notificationsEnabled });
+    }},
+    { id: 'streaks', label: settings.streaksEnabled ? 'Disable streaks' : 'Enable completion streaks', action: () => {
+      const enabling = !settings.streaksEnabled;
+      updateSettings({
+        streaksEnabled: enabling,
+        ...(enabling ? {} : { streakCurrent: 0, streakLastGoodDate: '' }),
+      });
+    }},
+    { id: 'density', label: `Density: ${settings.density === 'compact' ? 'comfortable' : 'compact'}`, action: () => {
+      updateSettings({ density: settings.density === 'compact' ? 'comfortable' : 'compact' });
+    }},
     { id: 'bulk', label: 'Toggle bulk select', keywords: 'multi select', action: () => setBulkMode((v) => !v) },
     ...savedFilters.map((f) => ({
       id: `filter-${f.id}`,
@@ -435,7 +542,7 @@ function Main() {
     }},
     { id: 'focus-clear', label: 'Exit focus mode', action: () => updateSettings({ focusListId: '' }) },
     { id: 'help', label: 'Keyboard shortcuts', shortcut: '?', action: () => setHelpOpen(true) },
-  ], [exportBackup, updateSettings, settings.darkMode, viewMode, savedFilters, applySavedFilter]);
+  ], [exportBackup, updateSettings, settings.darkMode, settings.streaksEnabled, settings.density, settings.notificationsEnabled, viewMode, savedFilters, applySavedFilter, addFolder]);
 
   const onGlobalKeyDown = useCallback(
     (event) => {
@@ -451,6 +558,12 @@ function Main() {
         event.preventDefault();
         if (event.shiftKey && redoStack.length) applyRedo();
         else if (undoStack.length) applyUndo();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'i') {
+        event.preventDefault();
+        setQuickCaptureOpen(true);
         return;
       }
 
@@ -478,7 +591,7 @@ function Main() {
       }
       if (focused && event.key === 'x') {
         event.preventDefault();
-        toggleItem(focused.listId, focused.itemId);
+        handleToggleItem(focused.listId, focused.itemId);
         return;
       }
       if (focused && (event.key === 'e' || event.key === 'Enter')) {
@@ -514,7 +627,7 @@ function Main() {
       }
     },
     [anyModalOpen, commandOpen, undoStack.length, redoStack.length, applyUndo, applyRedo, viewMode,
-      navigableItems, focusedItemKey, navigateItems, toggleItem, openItemModal]
+      navigableItems, focusedItemKey, navigateItems, handleToggleItem, openItemModal]
   );
 
   useEffect(() => {
@@ -543,7 +656,7 @@ function Main() {
   };
 
   return (
-    <div className="main" ref={fileDropRef}>
+    <div className="main" ref={fileDropRef} data-density={settings.density || 'comfortable'}>
       <LiveRegion message={liveMessage} />
 
       {storageError ? (
@@ -590,6 +703,27 @@ function Main() {
         onImportExport={() => setImportExportModalOpen(true)}
         onHelp={() => setHelpOpen(true)}
         onCommandPalette={() => setCommandOpen(true)}
+        onToggleStreaks={() => {
+          const enabling = !settings.streaksEnabled;
+          updateSettings({
+            streaksEnabled: enabling,
+            ...(enabling ? {} : { streakCurrent: 0, streakLastGoodDate: '' }),
+          });
+          announce(enabling ? 'Streaks enabled' : 'Streaks disabled');
+        }}
+        onToggleDensity={() => {
+          const next = settings.density === 'compact' ? 'comfortable' : 'compact';
+          updateSettings({ density: next });
+          announce(`${next === 'compact' ? 'Compact' : 'Comfortable'} density`);
+        }}
+        onQuickCapture={() => setQuickCaptureOpen(true)}
+        onReview={() => setReviewOpen(true)}
+        onItemTemplates={() => setItemTemplatesOpen(true)}
+        onManageTags={() => setTagManagerOpen(true)}
+        onToggleNotifications={() => {
+          updateSettings({ notificationsEnabled: !settings.notificationsEnabled });
+          announce(settings.notificationsEnabled ? 'Notifications disabled' : 'Notifications enabled');
+        }}
       />
 
       <BulkActionBar
@@ -606,6 +740,7 @@ function Main() {
         <GridView
           lists={lists}
           listsToShow={listsToShow}
+          matchingLists={matchingLists}
           settings={settings}
           itemFilter={itemFilter}
           searchQuery={searchQuery}
@@ -628,7 +763,8 @@ function Main() {
           onFocusMode={(listId) => updateSettings({ focusListId: listId, viewMode: 'grid' })}
           onShare={(msg) => announce(msg)}
           onAddItem={addItem}
-          onToggleItem={toggleItem}
+          onAddItems={addItems}
+          onToggleItem={handleToggleItem}
           onRenameItem={renameItem}
           onUpdateItemFields={updateItemFields}
           onDuplicateItem={duplicateItem}
@@ -646,11 +782,14 @@ function Main() {
           onRenameList={renameList}
           focusedItemKey={focusedItemKey}
           onShowStats={setStatsListId}
+          onToggleFolder={handleToggleFolder}
+          staleThresholdDays={settings.staleThresholdDays || 14}
         />
       ) : null}
       {viewMode === 'upcoming' ? (
         <UpcomingView
           items={upcomingItems}
+          blockedItems={blockedItems}
           onItemClick={openItemModal}
           focusedItemKey={focusedItemKey}
         />
@@ -691,11 +830,50 @@ function Main() {
           />
         </>
       ) : null}
+      {viewMode === 'calendar' ? (
+        <>
+          <div className="calendar-controls">
+            <label>
+              View
+              <select
+                className="style-select"
+                value={settings.calendarMode || 'month'}
+                onChange={(e) => updateSettings({ calendarMode: e.target.value })}
+              >
+                <option value="month">Month</option>
+                <option value="week">Week</option>
+              </select>
+            </label>
+          </div>
+          <CalendarView
+            lists={lists}
+            mode={settings.calendarMode || 'month'}
+            anchorDate={settings.calendarAnchor || todayDateString()}
+            onAnchorChange={(date) => updateSettings({ calendarAnchor: date })}
+            onItemClick={openItemModal}
+            focusedItemKey={focusedItemKey}
+          />
+        </>
+      ) : null}
 
       {settings.focusListId ? (
-        <button type="button" className="btn btn-secondary focus-exit" onClick={() => updateSettings({ focusListId: '' })}>
-          Exit focus mode
-        </button>
+        <>
+          <FocusTimer
+            minutes={settings.pomodoroMinutes || 25}
+            remaining={pomodoroRemaining}
+            running={pomodoroRunning}
+            listName={lists.find((l) => l.id === settings.focusListId)?.name}
+            onStart={() => {
+              setPomodoroRemaining((settings.pomodoroMinutes || 25) * 60);
+              setPomodoroRunning(true);
+            }}
+            onPause={() => setPomodoroRunning(false)}
+            onReset={() => { setPomodoroRunning(false); setPomodoroRemaining(0); }}
+          />
+          <button type="button" className="btn btn-secondary focus-exit" onClick={() => updateSettings({ focusListId: '' })}>
+            Exit focus mode
+          </button>
+        </>
       ) : null}
 
       {viewMode === 'grid' ? (
@@ -772,6 +950,46 @@ function Main() {
         onClose={() => setStatsListId(null)}
       />
 
+      <QuickCaptureModal
+        isOpen={quickCaptureOpen}
+        onClose={() => setQuickCaptureOpen(false)}
+        onSubmit={captureToInbox}
+        inboxName={inboxList?.name || 'Inbox'}
+      />
+
+      <ReviewModal
+        isOpen={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        lists={lists}
+        staleThresholdDays={settings.staleThresholdDays || 14}
+        onItemClick={(listId, itemId) => { setReviewOpen(false); openItemModal(listId, itemId); }}
+        onComplete={() => {
+          updateSettings({ lastReviewAt: new Date().toISOString() });
+          setReviewOpen(false);
+          announce('Review completed');
+        }}
+      />
+
+      <ItemTemplatesModal
+        isOpen={itemTemplatesOpen}
+        onClose={() => setItemTemplatesOpen(false)}
+        templates={itemTemplates}
+        onSelect={(templateId) => {
+          const listId = settings.lastUsedListId || lists[0]?.id;
+          if (listId) addItemFromTemplate(listId, templateId);
+          setItemTemplatesOpen(false);
+        }}
+        onDelete={deleteItemTemplate}
+      />
+
+      <TagManagerModal
+        isOpen={tagManagerOpen}
+        onClose={() => setTagManagerOpen(false)}
+        customTags={customTags}
+        onUpdateTag={updateCustomTag}
+        onDeleteTag={deleteCustomTag}
+      />
+
       {modalTarget && modalItem ? (
         <ListItemModal
           isOpen
@@ -781,6 +999,13 @@ function Main() {
           tags={modalItem.tags || []}
           priority={modalItem.priority || 0}
           recurring={modalItem.recurring || 'none'}
+          recurringIntervalDays={modalItem.recurringIntervalDays || 0}
+          recurringEndDate={modalItem.recurringEndDate || ''}
+          estimateMinutes={modalItem.estimateMinutes || 0}
+          blockedBy={modalItem.blockedBy || []}
+          customFieldValues={modalItem.customFieldValues || {}}
+          listCustomFields={modalList?.customFields || []}
+          currentItemId={modalItem.id}
           snoozedUntil={modalItem.snoozedUntil || ''}
           history={modalItem.history || []}
           completedAt={modalItem.completedAt || ''}
@@ -801,6 +1026,15 @@ function Main() {
           onAddCustomTag={addCustomTag}
           onSnooze={handleSnoozeItem}
           onClearSnooze={handleClearSnooze}
+          onSkipRecurring={() => skipRecurring(modalTarget.listId, modalItem.id)}
+          onSaveAsTemplate={() => {
+            saveItemAsTemplate(modalTarget.listId, modalItem.id, modalItem.text);
+            announce('Saved as item template');
+          }}
+          onNavigateToList={(listId) => {
+            updateSettings({ focusListId: listId, viewMode: 'grid' });
+            closeItemModal();
+          }}
         />
       ) : null}
 

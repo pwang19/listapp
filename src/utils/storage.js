@@ -3,6 +3,7 @@ export const ARCHIVE_KEY = 'listapp.archived';
 export const SETTINGS_KEY = 'listapp.settings';
 export const CUSTOM_TAGS_KEY = 'listapp.customTags';
 export const USER_TEMPLATES_KEY = 'listapp.userTemplates';
+export const ITEM_TEMPLATES_KEY = 'listapp.itemTemplates';
 export const BACKUP_KEY = 'listapp.backup';
 
 export class StorageError extends Error {
@@ -79,6 +80,21 @@ const DEFAULT_SETTINGS = {
   kanbanGroupBy: 'status',
   priorityScaleVersion: 1,
   savedFilters: [],
+  streaksEnabled: false,
+  streakCurrent: 0,
+  streakLongest: 0,
+  streakLastGoodDate: '',
+  density: 'comfortable',
+  calendarMode: 'month',
+  calendarAnchor: '',
+  inboxListId: '',
+  staleThresholdDays: 14,
+  notificationsEnabled: false,
+  pomodoroMinutes: 25,
+  pomodoroRemaining: 0,
+  pomodoroRunning: false,
+  lastReviewAt: '',
+  expandedFolderIds: [],
 };
 
 export function loadSettings() {
@@ -112,6 +128,20 @@ export function saveCustomTags(tags) {
 export function loadUserTemplates() {
   const templates = safeParse(localStorage.getItem(USER_TEMPLATES_KEY), []);
   return Array.isArray(templates) ? templates : [];
+}
+
+export function loadItemTemplates() {
+  const templates = safeParse(localStorage.getItem(ITEM_TEMPLATES_KEY), []);
+  return Array.isArray(templates) ? templates : [];
+}
+
+export function saveItemTemplates(templates) {
+  try {
+    localStorage.setItem(ITEM_TEMPLATES_KEY, JSON.stringify(templates));
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
 }
 
 export function saveUserTemplates(templates) {

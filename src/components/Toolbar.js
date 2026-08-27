@@ -30,6 +30,13 @@ function Toolbar({
   onImportExport,
   onHelp,
   onCommandPalette,
+  onToggleStreaks,
+  onToggleDensity,
+  onQuickCapture,
+  onReview,
+  onItemTemplates,
+  onManageTags,
+  onToggleNotifications,
 }) {
   return (
     <>
@@ -120,6 +127,11 @@ function Toolbar({
           ))}
         </div>
         <div className="toolbar-actions-end">
+          {settings.streaksEnabled && (settings.streakCurrent || 0) > 0 ? (
+            <span className="streak-badge" title={`Longest streak: ${settings.streakLongest || 0} days`}>
+              🔥 {settings.streakCurrent} day{(settings.streakCurrent || 0) === 1 ? '' : 's'}
+            </span>
+          ) : null}
           <button
             type="button"
             className="btn btn-secondary btn-icon"
@@ -131,12 +143,23 @@ function Toolbar({
           <ToolbarMoreMenu
             archivedCount={archivedCount}
             bulkMode={bulkMode}
+            streaksEnabled={settings.streaksEnabled}
+            streakCurrent={settings.streakCurrent}
+            density={settings.density || 'comfortable'}
+            notificationsEnabled={settings.notificationsEnabled}
             onTemplates={onTemplates}
             onArchive={onArchive}
             onPrintShare={onPrintShare}
             onToggleBulk={onToggleBulk}
             onImportExport={onImportExport}
             onHelp={onHelp}
+            onToggleStreaks={onToggleStreaks}
+            onToggleDensity={onToggleDensity}
+            onQuickCapture={onQuickCapture}
+            onReview={onReview}
+            onItemTemplates={onItemTemplates}
+            onManageTags={onManageTags}
+            onToggleNotifications={onToggleNotifications}
           />
           <button
             type="button"
@@ -180,6 +203,13 @@ Toolbar.propTypes = {
   onImportExport: PropTypes.func.isRequired,
   onHelp: PropTypes.func.isRequired,
   onCommandPalette: PropTypes.func.isRequired,
+  onToggleStreaks: PropTypes.func.isRequired,
+  onToggleDensity: PropTypes.func.isRequired,
+  onQuickCapture: PropTypes.func.isRequired,
+  onReview: PropTypes.func.isRequired,
+  onItemTemplates: PropTypes.func.isRequired,
+  onManageTags: PropTypes.func.isRequired,
+  onToggleNotifications: PropTypes.func.isRequired,
 };
 
 export default Toolbar;

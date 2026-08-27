@@ -1,13 +1,19 @@
-export function itemMatchesSearch(item, query) {
+export function itemMatchesSearch(item, query, { includeCustomFields = true } = {}) {
   if (!query) return true;
-  const hay = [
+  const parts = [
     item.text,
     item.description || '',
     ...(item.subItems || []).map((s) => s.text),
-  ]
-    .join(' ')
-    .toLowerCase();
-  return hay.includes(query);
+  ];
+  if (includeCustomFields && item.customFieldValues) {
+    parts.push(...Object.values(item.customFieldValues).map(String));
+  }
+  const hay = parts.join(' ').toLowerCase();
+  return query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .every((token) => hay.includes(token));
 }
 
 export function filterItems(items, { itemFilter = 'all', searchQuery = '', tagFilter = '' } = {}) {

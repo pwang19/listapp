@@ -2,10 +2,13 @@ import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import Modal from './Modal';
 import { listsToMarkdown, renderMarkdown } from '../../utils/helpers';
+import { listsToChecklistHtml, printHtmlDocument } from '../../utils/printLayouts';
 
 function PrintShareModal({ isOpen, onClose, lists }) {
   const markdown = useMemo(() => listsToMarkdown(lists), [lists]);
+  const checklistHtml = useMemo(() => listsToChecklistHtml(lists), [lists]);
   const [status, setStatus] = useState('');
+  const [layout, setLayout] = useState('markdown');
 
   const handleCopy = async () => {
     try {
@@ -29,23 +32,26 @@ function PrintShareModal({ isOpen, onClose, lists }) {
     setStatus('Download started.');
   };
 
-  const handlePrint = () => {
+  const handlePrintMarkdown = () => {
     const html = renderMarkdown(markdown);
-    const win = window.open('', '_blank', 'noopener,noreferrer');
-    if (!win) {
-      setStatus('Pop-up blocked. Allow pop-ups to print.');
-      return;
-    }
-    win.document.write(`<!doctype html><html><head><title>Lists</title>
+    const doc = `<!doctype html><html><head><title>Lists</title>
       <style>
         body { font-family: Georgia, serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #111; }
         h1,h2 { font-family: system-ui, sans-serif; }
         ul { line-height: 1.5; }
         blockquote { color: #555; border-left: 3px solid #ccc; margin-left: 0; padding-left: 0.75rem; }
-      </style></head><body>${html}</body></html>`);
-    win.document.close();
-    win.focus();
-    win.print();
+      </style></head><body>${html}</body></html>`;
+    if (!printHtmlDocument(doc)) {
+      setStatus('Pop-up blocked. Allow pop-ups to print.');
+    }
+  };
+
+  const handlePrintChecklist = () => {
+    if (!printHtmlDocument(checklistHtml)) {
+      setStatus('Pop-up blocked. Allow pop-ups to print.');
+      return;
+    }
+    setStatus('Checklist print opened.');
   };
 
   return (
@@ -67,24 +73,61 @@ function PrintShareModal({ isOpen, onClose, lists }) {
         ×
       </button>
 
+      <div className="field">
+        <span className="field-label">Layout</span>
+        <div className="filter-group" role="group" aria-label="Print layout">
+          <button
+            type="button"
+            className={`chip-btn${layout === 'markdown' ? ' is-active' : ''}`}
+            onClick={() => setLayout('markdown')}
+          >
+            Markdown
+          </button>
+          <button
+            type="button"
+            className={`chip-btn${layout === 'checklist' ? ' is-active' : ''}`}
+            onClick={() => setLayout('checklist')}
+          >
+            Checklist
+          </button>
+        </div>
+      </div>
+
       <p className="empty-hint" style={{ fontStyle: 'normal' }}>
-        Export a clean Markdown snapshot for sharing or printing.
+        {layout === 'checklist'
+          ? 'Print-friendly layout with checkbox rows — great for paper lists.'
+          : 'Export a clean Markdown snapshot for sharing or printing.'}
       </p>
 
-      <pre className="share-preview">{markdown}</pre>
+      {layout === 'markdown' ? (
+        <pre className="share-preview">{markdown}</pre>
+      ) : (
+        <div
+          className="share-preview checklist-preview"
+          dangerouslySetInnerHTML={{ __html: checklistHtml.match(/<body>([\s\S]*)<\/body>/)?.[1] || '' }}
+        />
+      )}
 
       {status ? <p className="form-feedback form-feedback--ok">{status}</p> : null}
 
       <div className="button-row button-row--wrap">
-        <button type="button" className="btn btn-secondary" onClick={handleCopy}>
-          Copy Markdown
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={handleDownload}>
-          Download .md
-        </button>
-        <button type="button" className="btn btn-primary" onClick={handlePrint}>
-          Print
-        </button>
+        {layout === 'markdown' ? (
+          <>
+            <button type="button" className="btn btn-secondary" onClick={handleCopy}>
+              Copy Markdown
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={handleDownload}>
+              Download .md
+            </button>
+            <button type="button" className="btn btn-primary" onClick={handlePrintMarkdown}>
+              Print
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn btn-primary" onClick={handlePrintChecklist}>
+            Print checklist
+          </button>
+        )}
       </div>
     </Modal>
   );

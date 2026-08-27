@@ -34,6 +34,8 @@ export const RECURRING_OPTIONS = [
   { id: 'daily', label: 'Daily' },
   { id: 'weekly', label: 'Weekly' },
   { id: 'monthly', label: 'Monthly' },
+  { id: 'weekdays', label: 'Weekdays only' },
+  { id: 'custom', label: 'Custom interval' },
 ];
 
 export const SORT_MODES = [
@@ -50,6 +52,12 @@ export const VIEW_MODES = [
   { id: 'all', label: 'All items' },
   { id: 'kanban', label: 'Kanban' },
   { id: 'upcoming', label: 'Upcoming' },
+  { id: 'calendar', label: 'Calendar' },
+];
+
+export const DENSITY_MODES = [
+  { id: 'comfortable', label: 'Comfortable' },
+  { id: 'compact', label: 'Compact' },
 ];
 
 export const MAX_UNDO = 10;

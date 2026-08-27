@@ -22,6 +22,9 @@ import { filterItems } from '../../utils/filterItems';
 import { sortItems } from '../../utils/sortItems';
 import { listToMarkdown } from '../../utils/helpers';
 import { encodeListToHash } from '../../utils/shareLink';
+import { getListThemeClass, getListThemeStyle } from '../../utils/listThemes';
+import { isItemBlocked } from '../../utils/dependencies';
+import { isStaleItem, countStaleInList } from '../../utils/staleItems';
 
 const itemShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -43,6 +46,9 @@ function List({
   name,
   color = 'slate',
   icon = '📋',
+  theme = 'none',
+  customFields = [],
+  parentId = '',
   items = [],
   sortMode = 'manual',
   collapsed = false,
@@ -81,6 +87,9 @@ function List({
   filtersActive = false,
   focusedItemKey = '',
   onShowStats,
+  onAddItems,
+  staleThresholdDays = 14,
+  allListsForDeps = [],
 }) {
   const [inputValue, setInputValue] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -94,6 +103,11 @@ function List({
 
   const colorMeta = LIST_COLORS.find((c) => c.id === color) || LIST_COLORS[0];
   const completedCount = items.filter((i) => i.complete).length;
+  const staleCount = countStaleInList({ items }, staleThresholdDays);
+  const folders = useMemo(
+    () => (allLists || []).filter((l) => l.isFolder),
+    [allLists]
+  );
 
   const visibleItems = useMemo(() => {
     const filtered = filterItems(items, { itemFilter, searchQuery, tagFilter });
@@ -107,6 +121,13 @@ function List({
       onAddItem(inputValue.trim());
       setInputValue('');
     }
+  };
+
+  const handlePaste = (event) => {
+    const text = event.clipboardData?.getData('text');
+    if (!text || !text.includes('\n') || !onAddItems) return;
+    event.preventDefault();
+    onAddItems(text);
   };
 
   const handleItemNameClick = (itemId) => {
@@ -139,9 +160,12 @@ function List({
   return (
     <ListDropZone listId={listId}>
       <article
-        className={`list-card${collapsed ? ' is-collapsed' : ''}${pinned ? ' is-pinned' : ''}`}
+        className={`list-card${collapsed ? ' is-collapsed' : ''}${pinned ? ' is-pinned' : ''}${menuOpen ? ' is-menu-open' : ''} ${getListThemeClass(theme)}`.trim()}
         data-list-id={listId}
-        style={{ borderTop: `4px solid ${colorMeta.value}` }}
+        style={{
+          borderTop: `4px solid ${colorMeta.value}`,
+          ...getListThemeStyle(colorMeta.value, theme),
+        }}
       >
         <div className="list-card-top-actions">
           <button
@@ -224,6 +248,7 @@ function List({
             </h2>
             <span className="list-progress" aria-label={`${completedCount} of ${items.length} complete`}>
               {completedCount}/{items.length}
+              {staleCount > 0 ? <span className="list-stale-badge" title="Stale items"> · {staleCount} stale</span> : null}
             </span>
           </div>
         </div>
@@ -232,7 +257,11 @@ function List({
           <ListCustomizePopover
             icon={icon}
             color={color}
+            theme={theme}
             sortMode={sortMode}
+            customFields={customFields}
+            parentId={parentId}
+            folders={folders}
             onSetListStyle={onSetListStyle}
             onSetListMeta={onSetListMeta}
             onClose={() => setCustomizeOpen(false)}
@@ -285,6 +314,9 @@ function List({
                           onArchive={() => onDeleteItem(item.id)}
                           onSubItemToggle={(subId) => onToggleSubItem(item.id, subId)}
                           onAddSubItem={(text) => onAddSubItem(item.id, text)}
+                          estimateMinutes={item.estimateMinutes || 0}
+                          isBlocked={isItemBlocked(allListsForDeps.length ? allListsForDeps : allLists, item)}
+                          isStale={isStaleItem(item, staleThresholdDays)}
                           keyboardFocused={focusedItemKey === itemKey}
                           itemKey={itemKey}
                         />
@@ -301,7 +333,8 @@ function List({
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Add item… #tag !date !p2"
+                onPaste={handlePaste}
+                placeholder="Add item… #tag !date !p2 (~30m). Paste multiple lines."
                 aria-label={`Add item to ${name}`}
                 className="text-input"
                 data-list-add-item={listId}
@@ -328,6 +361,9 @@ List.propTypes = {
   name: PropTypes.string.isRequired,
   color: PropTypes.string,
   icon: PropTypes.string,
+  theme: PropTypes.string,
+  customFields: PropTypes.array,
+  parentId: PropTypes.string,
   items: PropTypes.arrayOf(itemShape),
   sortMode: PropTypes.string,
   collapsed: PropTypes.bool,
@@ -366,6 +402,9 @@ List.propTypes = {
   filtersActive: PropTypes.bool,
   focusedItemKey: PropTypes.string,
   onShowStats: PropTypes.func,
+  onAddItems: PropTypes.func,
+  staleThresholdDays: PropTypes.number,
+  allListsForDeps: PropTypes.array,
 };
 
 export default List;

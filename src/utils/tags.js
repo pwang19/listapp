@@ -1,11 +1,27 @@
 import { TAG_PALETTE, CUSTOM_TAG_COLORS } from './constants';
 import { createId } from './ids';
 
+export function resolveTagId(tagInput, customTags = []) {
+  const raw = tagInput.trim().toLowerCase();
+  if (!raw) return '';
+  const all = getAllTags(customTags);
+  const direct = all.find((t) => t.id === raw);
+  if (direct) return direct.id;
+  const byLabel = all.find((t) => t.label.toLowerCase() === raw);
+  if (byLabel) return byLabel.id;
+  const byAlias = (customTags || []).find((t) =>
+    (t.aliases || []).some((a) => a.toLowerCase() === raw)
+  );
+  return byAlias?.id || raw;
+}
+
 export function getAllTags(customTags = []) {
   const custom = (customTags || []).map((t) => ({
     id: t.id,
     label: t.label,
     color: t.color,
+    parentId: t.parentId || '',
+    aliases: t.aliases || [],
     custom: true,
   }));
   const builtIn = TAG_PALETTE.map((t) => ({ ...t, custom: false }));

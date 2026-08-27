@@ -8,7 +8,7 @@ import {
 import { reorderArray } from '../utils/helpers';
 import { PRIORITY_SCALE_VERSION } from '../utils/constants';
 import { cloneList, cloneItem } from '../utils/clone';
-import { applyRecurringOnComplete } from '../utils/recurring';
+import { applyRecurringOnComplete, skipRecurringOccurrence } from '../utils/recurring';
 import { appendHistory, createHistoryEntry } from '../utils/itemHistory';
 import {
   loadLists,
@@ -28,6 +28,20 @@ export function updateItem(lists, listId, itemId, updater) {
   }));
 }
 
+function touchItem(item, patch = {}) {
+  return { ...item, ...patch, lastTouchedAt: new Date().toISOString() };
+}
+
+function removeBlockerRefs(lists, itemId) {
+  return lists.map((list) => ({
+    ...list,
+    items: list.items.map((item) => ({
+      ...item,
+      blockedBy: (item.blockedBy || []).filter((id) => id !== itemId),
+    })),
+  }));
+}
+
 export function listsReducer(state, action) {
   switch (action.type) {
     case 'SET_LISTS':
@@ -40,6 +54,8 @@ export function listsReducer(state, action) {
           items: [],
           color: action.color,
           icon: action.icon,
+          isFolder: action.isFolder,
+          parentId: action.parentId,
         }, action.customTags),
       ];
     case 'DUPLICATE_LIST': {
@@ -54,6 +70,7 @@ export function listsReducer(state, action) {
         ...list,
         color: action.color ?? list.color,
         icon: action.icon ?? list.icon,
+        theme: action.theme ?? list.theme,
       }));
     case 'SET_LIST_META':
       return updateList(state, action.listId, (list) => ({
@@ -73,13 +90,34 @@ export function listsReducer(state, action) {
             normalizeItem({
               text: action.text,
               complete: false,
-              description: '',
+              description: action.description || '',
               dueDate: action.dueDate || '',
               tags: action.tags || [],
               priority: action.priority || 0,
-              subItems: [],
+              estimateMinutes: action.estimateMinutes || 0,
+              subItems: action.subItems || [],
             }, action.customTags),
             createHistoryEntry('created')
+          ),
+        ],
+      }));
+    case 'ADD_ITEMS':
+      return updateList(state, action.listId, (list) => ({
+        ...list,
+        items: [
+          ...list.items,
+          ...action.items.map((parsed) =>
+            appendHistory(
+              normalizeItem({
+                text: parsed.text,
+                complete: false,
+                tags: parsed.tags || [],
+                dueDate: parsed.dueDate || '',
+                priority: parsed.priority || 0,
+                estimateMinutes: parsed.estimateMinutes || 0,
+              }, action.customTags),
+              createHistoryEntry('created')
+            )
           ),
         ],
       }));
@@ -146,6 +184,10 @@ export function listsReducer(state, action) {
         ...list,
         items: [...list.items, normalizeItem(action.item, action.customTags)],
       }));
+    case 'SKIP_RECURRING':
+      return updateItem(state, action.listId, action.itemId, (item) =>
+        touchItem(skipRecurringOccurrence(item), {})
+      );
     case 'TOGGLE_ITEM':
       return updateItem(state, action.listId, action.itemId, (item) => {
         const next = { ...item, complete: !item.complete };
@@ -188,7 +230,8 @@ export function listsReducer(state, action) {
           }
         }
         const next = normalizeItem({ ...item, ...patch }, action.customTags);
-        return entry ? appendHistory(next, entry) : next;
+        const touched = touchItem(next, {});
+        return entry ? appendHistory(touched, entry) : touched;
       });
     case 'ADD_SUB_ITEM':
       return updateItem(state, action.listId, action.itemId, (item) =>
@@ -234,10 +277,13 @@ export function listsReducer(state, action) {
         subItems: reorderArray(item.subItems || [], action.activeId, action.overId),
       }));
     case 'DELETE_ITEM':
-      return updateList(state, action.listId, (list) => ({
-        ...list,
-        items: list.items.filter((item) => item.id !== action.itemId),
-      }));
+      return removeBlockerRefs(
+        updateList(state, action.listId, (list) => ({
+          ...list,
+          items: list.items.filter((item) => item.id !== action.itemId),
+        })),
+        action.itemId
+      );
     case 'DELETE_COMPLETED_ITEMS':
       return updateList(state, action.listId, (list) => ({
         ...list,

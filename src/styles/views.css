@@ -275,3 +275,139 @@
   font-size: 0.7rem;
   color: var(--text-muted);
 }
+
+.calendar-view {
+  margin-bottom: 2rem;
+}
+
+.calendar-controls {
+  margin-bottom: 1rem;
+  color: var(--text-on-dark);
+}
+
+.calendar-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.calendar-title {
+  flex: 1;
+  margin: 0;
+  color: var(--text-on-dark);
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.calendar-today {
+  color: var(--text-on-dark);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.35rem;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(232, 238, 244, 0.75);
+  padding: 0.25rem;
+}
+
+.calendar-cell {
+  min-height: 88px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.calendar-grid--week .calendar-cell {
+  min-height: 160px;
+}
+
+.calendar-cell--pad {
+  background: transparent;
+  border-color: transparent;
+}
+
+.calendar-cell.is-today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.calendar-cell.is-outside {
+  opacity: 0.55;
+}
+
+.calendar-day-num {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.calendar-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  overflow: hidden;
+}
+
+.calendar-item-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.25rem;
+  border: none;
+  border-radius: 4px;
+  background: rgba(47, 111, 237, 0.08);
+  font-size: 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.calendar-item-btn.is-overdue {
+  background: rgba(225, 29, 72, 0.12);
+}
+
+.calendar-item-btn.is-keyboard-focused {
+  outline: 2px solid var(--accent);
+}
+
+.calendar-item-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-more {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  padding-left: 0.25rem;
+}
+
+.checklist-preview {
+  background: #fff;
+  color: #111;
+}

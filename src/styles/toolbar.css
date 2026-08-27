@@ -113,3 +113,18 @@
 .saved-filters-select {
   max-width: 160px;
 }
+
+.streak-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-on-dark);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+}
+
+.toolbar-more-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 0.25rem 0;
+}

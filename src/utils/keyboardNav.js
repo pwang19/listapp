@@ -47,6 +47,17 @@ export function buildNavigableItems({
     return keys;
   }
 
+  if (viewMode === 'calendar') {
+    const keys = [];
+    lists.forEach((list) => {
+      (list.items || []).forEach((item) => {
+        if (!item.dueDate || item.complete) return;
+        keys.push({ listId: list.id, itemId: item.id, key: `${list.id}:${item.id}` });
+      });
+    });
+    return keys.sort((a, b) => a.key.localeCompare(b.key));
+  }
+
   const rows = [];
   listsToShow.forEach((list) => {
     const filtered = filterItems(list.items, { itemFilter, searchQuery, tagFilter });

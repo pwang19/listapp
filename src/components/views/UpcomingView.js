@@ -1,29 +1,28 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { isOverdue, isDueSoon } from '../../utils/helpers';
-import { LIST_COLORS } from '../../utils/constants';
 
-function UpcomingView({ items, onItemClick, focusedItemKey }) {
-  if (!items.length) {
+function UpcomingView({ items, blockedItems = [], onItemClick, focusedItemKey }) {
+  const overdue = items.filter((r) => r.overdue);
+  const dueSoon = items.filter((r) => r.dueSoon && !r.overdue);
+  const upcoming = items.filter((r) => !r.overdue && !r.dueSoon);
+  const hasContent = items.length > 0 || blockedItems.length > 0;
+
+  if (!hasContent) {
     return (
       <p className="empty-state">
-        No upcoming or overdue items. Add due dates to items to see them here.
+        No upcoming, overdue, or blocked items. Add due dates to items to see them here.
       </p>
     );
   }
 
-  const overdue = items.filter((r) => r.overdue);
-  const dueSoon = items.filter((r) => r.dueSoon && !r.overdue);
-  const upcoming = items.filter((r) => !r.overdue && !r.dueSoon);
-
-  const renderGroup = (title, rows) => {
+  const renderGroup = (title, rows, { showDue = true } = {}) => {
     if (!rows.length) return null;
     return (
       <section className="upcoming-group">
         <h3 className="upcoming-group-title">{title}</h3>
         <ul className="upcoming-list">
           {rows.map(({ listId, listName, listIcon, item }) => {
-            const colorMeta = LIST_COLORS.find((c) => c.id === item.listColor) || LIST_COLORS[0];
             const focusKey = `${listId}:${item.id}`;
             return (
               <li key={`${listId}-${item.id}`} data-item-key={focusKey}>
@@ -36,11 +35,15 @@ function UpcomingView({ items, onItemClick, focusedItemKey }) {
                     {listIcon} {listName}
                   </span>
                   <span className="upcoming-item-text">{item.text}</span>
-                  <span
-                    className={`due-badge${isOverdue(item.dueDate, false) ? ' is-overdue' : ''}${isDueSoon(item.dueDate, false) ? ' is-due-soon' : ''}`}
-                  >
-                    {item.dueDate}
-                  </span>
+                  {showDue && item.dueDate ? (
+                    <span
+                      className={`due-badge${isOverdue(item.dueDate, false) ? ' is-overdue' : ''}${isDueSoon(item.dueDate, false) ? ' is-due-soon' : ''}`}
+                    >
+                      {item.dueDate}
+                    </span>
+                  ) : (
+                    <span className="blocked-badge" title="Blocked">🔒</span>
+                  )}
                 </button>
               </li>
             );
@@ -52,6 +55,7 @@ function UpcomingView({ items, onItemClick, focusedItemKey }) {
 
   return (
     <div className="upcoming-view">
+      {renderGroup('Blocked', blockedItems, { showDue: false })}
       {renderGroup('Overdue', overdue)}
       {renderGroup('Due soon', dueSoon)}
       {renderGroup('Upcoming', upcoming)}
@@ -61,6 +65,7 @@ function UpcomingView({ items, onItemClick, focusedItemKey }) {
 
 UpcomingView.propTypes = {
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
+  blockedItems: PropTypes.arrayOf(PropTypes.object),
   onItemClick: PropTypes.func.isRequired,
   focusedItemKey: PropTypes.string,
 };

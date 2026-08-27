@@ -1,6 +1,9 @@
 import { createId } from './ids';
 import { LIST_COLORS, LIST_ICONS, RECURRING_OPTIONS } from './constants';
-import { getAllTags } from './tags';
+import { LIST_THEME_IDS } from './listThemes';
+import { getAllTags, resolveTagId } from './tags';
+
+const CUSTOM_FIELD_TYPES = new Set(['text', 'url', 'number', 'checkbox']);
 
 const validColorIds = new Set(LIST_COLORS.map((c) => c.id));
 const validIcons = new Set(LIST_ICONS);
@@ -41,7 +44,11 @@ export function normalizeSubItem(subItem = {}) {
 export function normalizeItem(item = {}, customTags = []) {
   const validTagIds = new Set(getAllTags(customTags).map((t) => t.id));
   const tags = Array.isArray(item.tags)
-    ? item.tags.filter((tag) => typeof tag === 'string' && validTagIds.has(tag))
+    ? [...new Set(
+        item.tags
+          .map((tag) => (typeof tag === 'string' ? resolveTagId(tag, customTags) : ''))
+          .filter((tag) => tag && validTagIds.has(tag))
+      )]
     : [];
   const dueDate =
     typeof item.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)
@@ -69,6 +76,29 @@ export function normalizeItem(item = {}, customTags = []) {
         .slice(-50)
     : [];
 
+  const recurringEndDate =
+    typeof item.recurringEndDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.recurringEndDate)
+      ? item.recurringEndDate
+      : '';
+  const recurringIntervalDays =
+    typeof item.recurringIntervalDays === 'number' && item.recurringIntervalDays > 0
+      ? Math.round(item.recurringIntervalDays)
+      : 0;
+  const blockedBy = Array.isArray(item.blockedBy)
+    ? item.blockedBy.filter((id) => typeof id === 'string')
+    : [];
+  const estimateMinutes =
+    typeof item.estimateMinutes === 'number' && item.estimateMinutes > 0
+      ? Math.min(Math.round(item.estimateMinutes), 9999)
+      : 0;
+  const customFieldValues =
+    item.customFieldValues && typeof item.customFieldValues === 'object'
+      ? item.customFieldValues
+      : {};
+  const createdAt = typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString();
+  const lastTouchedAt =
+    typeof item.lastTouchedAt === 'string' ? item.lastTouchedAt : createdAt;
+
   return {
     id: item.id || createId(),
     text: typeof item.text === 'string' ? item.text : '',
@@ -78,9 +108,15 @@ export function normalizeItem(item = {}, customTags = []) {
     tags,
     priority,
     recurring,
+    recurringIntervalDays,
+    recurringEndDate,
+    blockedBy,
+    estimateMinutes,
+    customFieldValues,
     snoozedUntil,
     history,
-    createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+    createdAt,
+    lastTouchedAt,
     completedAt: typeof item.completedAt === 'string' ? item.completedAt : '',
     subItems: Array.isArray(item.subItems)
       ? item.subItems.map(normalizeSubItem)
@@ -99,12 +135,31 @@ export function normalizeList(list = {}, customTags = []) {
     typeof list.sortMode === 'string'
       ? list.sortMode
       : 'manual';
+  const theme =
+    typeof list.theme === 'string' && LIST_THEME_IDS.has(list.theme)
+      ? list.theme
+      : 'none';
+  const parentId = typeof list.parentId === 'string' ? list.parentId : '';
+  const isFolder = Boolean(list.isFolder);
+  const customFields = Array.isArray(list.customFields)
+    ? list.customFields
+        .filter((f) => f && typeof f.label === 'string')
+        .map((f) => ({
+          id: f.id || createId(),
+          label: f.label,
+          type: CUSTOM_FIELD_TYPES.has(f.type) ? f.type : 'text',
+        }))
+    : [];
 
   return {
     id: list.id || createId(),
     name: typeof list.name === 'string' ? list.name : '',
     color,
     icon,
+    theme,
+    parentId,
+    isFolder,
+    customFields,
     sortMode,
     collapsed: Boolean(list.collapsed),
     pinned: Boolean(list.pinned),
@@ -144,5 +199,9 @@ export function normalizeCustomTag(tag = {}) {
     id: typeof tag.id === 'string' ? tag.id : createId(),
     label: typeof tag.label === 'string' ? tag.label : '',
     color: typeof tag.color === 'string' ? tag.color : '#64748b',
+    parentId: typeof tag.parentId === 'string' ? tag.parentId : '',
+    aliases: Array.isArray(tag.aliases)
+      ? tag.aliases.filter((a) => typeof a === 'string').map((a) => a.toLowerCase())
+      : [],
   };
 }

@@ -10,6 +10,8 @@ import {
   saveCustomTags,
   loadUserTemplates,
   saveUserTemplates,
+  loadItemTemplates,
+  saveItemTemplates,
   downloadBackup,
   needsBackupReminder,
 } from '../utils/storage';
@@ -23,8 +25,11 @@ import { mergeLists } from '../utils/mergeLists';
 import { PRIORITY_SCALE_VERSION, BUILTIN_TAG_IDS } from '../utils/constants';
 import { TEMPLATES } from '../utils/templates';
 import { parseQuickAdd } from '../utils/parseQuickAdd';
+import { parseBatchQuickAdd } from '../utils/batchQuickAdd';
+import { isItemBlocked } from '../utils/dependencies';
 import { createCustomTag } from '../utils/tags';
 import { launchConfetti } from '../utils/confetti';
+import { syncStreak } from '../utils/streaks';
 import { listsReducer, getInitialLists, getInitialArchived } from '../state/listsReducer';
 import {
   trimStack,
@@ -40,6 +45,7 @@ export function useLists() {
   const [archived, setArchived] = useState(getInitialArchived);
   const [customTags, setCustomTags] = useState(loadCustomTags);
   const [userTemplates, setUserTemplates] = useState(loadUserTemplates);
+  const [itemTemplates, setItemTemplates] = useState(loadItemTemplates);
   const [settings, setSettings] = useState(loadSettings);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -66,7 +72,26 @@ export function useLists() {
 
   useEffect(() => { saveCustomTags(customTags); }, [customTags]);
   useEffect(() => { saveUserTemplates(userTemplates); }, [userTemplates]);
+  useEffect(() => { saveItemTemplates(itemTemplates); }, [itemTemplates]);
   useEffect(() => { saveSettings(settings); }, [settings]);
+
+  useEffect(() => {
+    if (!settings.streaksEnabled) return;
+    setSettings((prev) => {
+      if (!prev.streaksEnabled) return prev;
+      const patch = syncStreak(prev, lists);
+      if (!patch) return prev;
+      const next = { ...prev, ...patch };
+      if (
+        prev.streakCurrent === next.streakCurrent &&
+        prev.streakLongest === next.streakLongest &&
+        prev.streakLastGoodDate === next.streakLastGoodDate
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [lists, settings.streaksEnabled]);
 
   useEffect(() => {
     const stored = loadSettings();
@@ -164,6 +189,16 @@ export function useLists() {
     return tag;
   }, []);
 
+  const updateCustomTag = useCallback((tagId, patch) => {
+    setCustomTags((prev) =>
+      prev.map((tag) => (tag.id === tagId ? normalizeCustomTag({ ...tag, ...patch }) : tag))
+    );
+  }, []);
+
+  const deleteCustomTag = useCallback((tagId) => {
+    setCustomTags((prev) => prev.filter((tag) => tag.id !== tagId && tag.parentId !== tagId));
+  }, []);
+
   const addList = useCallback(
     (name, style = {}) => {
       withUndo('List added', () => {
@@ -172,12 +207,35 @@ export function useLists() {
           name,
           color: style.color,
           icon: style.icon,
+          isFolder: style.isFolder,
+          parentId: style.parentId,
           customTags: customTagsRef.current,
         });
       });
       updateSettings({ lastUsedListId: '' });
     },
     [withUndo, updateSettings]
+  );
+
+  const ensureInbox = useCallback(() => {
+    const existing = listsRef.current.find((l) => l.name.toLowerCase() === 'inbox');
+    if (existing) {
+      if (settings.inboxListId !== existing.id) {
+        updateSettings({ inboxListId: existing.id });
+      }
+      return existing.id;
+    }
+    const list = normalizeList({ name: 'Inbox', icon: '📥', color: 'blue' }, customTagsRef.current);
+    dispatch({ type: 'SET_LISTS', lists: [list, ...listsRef.current] });
+    updateSettings({ inboxListId: list.id });
+    return list.id;
+  }, [settings.inboxListId, updateSettings]);
+
+  const addFolder = useCallback(
+    (name) => {
+      addList(name, { icon: '📁', color: 'slate', isFolder: true });
+    },
+    [addList]
   );
 
   const duplicateList = useCallback(
@@ -237,9 +295,9 @@ export function useLists() {
   );
 
   const setListStyle = useCallback(
-    (listId, { color, icon }) => {
+    (listId, style = {}) => {
       withUndo('List style updated', () => {
-        dispatch({ type: 'SET_LIST_STYLE', listId, color, icon });
+        dispatch({ type: 'SET_LIST_STYLE', listId, ...style });
       });
     },
     [withUndo]
@@ -296,12 +354,46 @@ export function useLists() {
           tags: parsed.tags,
           dueDate: parsed.dueDate,
           priority: parsed.priority,
+          estimateMinutes: parsed.estimateMinutes,
           customTags: customTagsRef.current,
         });
       });
       updateSettings({ lastUsedListId: listId });
     },
     [withUndo, addCustomTag, updateSettings]
+  );
+
+  const addItems = useCallback(
+    (listId, lines) => {
+      const parsedItems = parseBatchQuickAdd(lines);
+      if (!parsedItems.length) return;
+      parsedItems.forEach((parsed) => {
+        parsed.tags.forEach((tagId) => {
+          if (!customTagsRef.current.some((t) => t.id === tagId) &&
+              !BUILTIN_TAG_IDS.includes(tagId)) {
+            addCustomTag(tagId);
+          }
+        });
+      });
+      withUndo(`Added ${parsedItems.length} items`, () => {
+        dispatch({
+          type: 'ADD_ITEMS',
+          listId,
+          items: parsedItems,
+          customTags: customTagsRef.current,
+        });
+      });
+      updateSettings({ lastUsedListId: listId });
+    },
+    [withUndo, addCustomTag, updateSettings]
+  );
+
+  const captureToInbox = useCallback(
+    (text) => {
+      const listId = ensureInbox();
+      addItem(listId, text);
+    },
+    [ensureInbox, addItem]
   );
 
   const duplicateItem = useCallback(
@@ -373,7 +465,9 @@ export function useLists() {
     (listId, itemId) => {
       const list = listsRef.current.find((l) => l.id === listId);
       const item = list?.items.find((i) => i.id === itemId);
-      const wasComplete = item?.complete;
+      if (!item) return false;
+      const wasComplete = item.complete;
+      if (!wasComplete && isItemBlocked(listsRef.current, item)) return false;
       withUndo(wasComplete ? 'Item unchecked' : 'Item completed', () => {
         dispatch({ type: 'TOGGLE_ITEM', listId, itemId });
       });
@@ -383,9 +477,58 @@ export function useLists() {
           setTimeout(() => launchConfetti(), 100);
         }
       }
+      return true;
     },
     [withUndo]
   );
+
+  const skipRecurring = useCallback((listId, itemId) => {
+    withUndo('Skipped recurring occurrence', () => {
+      dispatch({ type: 'SKIP_RECURRING', listId, itemId });
+    });
+  }, [withUndo]);
+
+  const saveItemAsTemplate = useCallback((listId, itemId, name) => {
+    const list = listsRef.current.find((l) => l.id === listId);
+    const item = list?.items.find((i) => i.id === itemId);
+    if (!item) return;
+    const template = {
+      id: createId(),
+      name: name || item.text,
+      text: item.text,
+      description: item.description || '',
+      tags: item.tags || [],
+      priority: item.priority || 0,
+      estimateMinutes: item.estimateMinutes || 0,
+      subItems: (item.subItems || []).map((s) => ({ text: s.text })),
+    };
+    setItemTemplates((prev) => [...prev, template]);
+  }, []);
+
+  const addItemFromTemplate = useCallback(
+    (listId, templateId) => {
+      const template = itemTemplates.find((t) => t.id === templateId);
+      if (!template) return;
+      withUndo(`Added "${template.name}"`, () => {
+        dispatch({
+          type: 'ADD_ITEM',
+          listId,
+          text: template.text,
+          description: template.description || '',
+          tags: template.tags || [],
+          priority: template.priority || 0,
+          estimateMinutes: template.estimateMinutes || 0,
+          subItems: (template.subItems || []).map((s) => ({ text: s.text, complete: false })),
+          customTags: customTagsRef.current,
+        });
+      });
+    },
+    [withUndo, itemTemplates]
+  );
+
+  const deleteItemTemplate = useCallback((templateId) => {
+    setItemTemplates((prev) => prev.filter((t) => t.id !== templateId));
+  }, []);
 
   const renameItem = useCallback(
     (listId, itemId, name) => {
@@ -563,6 +706,7 @@ export function useLists() {
     archived,
     customTags,
     userTemplates,
+    itemTemplates,
     settings,
     undoStack,
     redoStack,
@@ -574,7 +718,12 @@ export function useLists() {
     dismissToast,
     updateSettings,
     addCustomTag,
+    updateCustomTag,
+    deleteCustomTag,
     addList,
+    addFolder,
+    ensureInbox,
+    captureToInbox,
     duplicateList,
     saveListAsTemplate,
     addTemplate,
@@ -584,12 +733,17 @@ export function useLists() {
     deleteList,
     reorderLists,
     addItem,
+    addItems,
     duplicateItem,
     moveItem,
     bulkUpdateItems,
     bulkMoveItems,
     bulkArchiveItems,
     toggleItem,
+    skipRecurring,
+    saveItemAsTemplate,
+    addItemFromTemplate,
+    deleteItemTemplate,
     renameItem,
     updateItemFields,
     addSubItem,
