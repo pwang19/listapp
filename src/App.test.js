@@ -87,3 +87,20 @@ test('search filter finds lists by name', () => {
   expect(screen.getByText('Beta')).toBeInTheDocument();
   expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
 });
+
+test('clicking an item opens the details modal', () => {
+  render(<App />);
+  const listInput = screen.getByLabelText(/Add a new list/i);
+  fireEvent.change(listInput, { target: { value: 'Errands' } });
+  fireEvent.keyDown(listInput, { key: 'Enter', code: 'Enter' });
+
+  const itemInput = screen.getByLabelText(/Add item to Errands/i);
+  fireEvent.change(itemInput, { target: { value: 'Buy milk' } });
+  fireEvent.keyDown(itemInput, { key: 'Enter', code: 'Enter' });
+
+  fireEvent.click(screen.getByRole('button', { name: /Open details for Buy milk/i }));
+
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getByText('Buy milk')).toBeInTheDocument();
+  expect(within(dialog).getByLabelText(/Notes/i)).toBeInTheDocument();
+});
