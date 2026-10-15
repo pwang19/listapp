@@ -1,8 +1,11 @@
-import { describe, test, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import App from './App';
 import { STORAGE_KEY } from './utils/storage';
 import { normalizeLists } from './utils/normalizeLists';
+import * as syncModule from './utils/sync';
+import { normalizeSyncDoc } from './utils/sync';
+import { fakeSupabase } from './test/fakeSupabase';
 
 beforeEach(() => {
   localStorage.clear();
@@ -103,4 +106,33 @@ test('clicking an item opens the details modal', () => {
   const dialog = screen.getByRole('dialog');
   expect(within(dialog).getByText('Buy milk')).toBeInTheDocument();
   expect(within(dialog).getByLabelText(/Notes/i)).toBeInTheDocument();
+});
+
+describe('sync', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('loads lists from the account and pushes local edits back', async () => {
+    const remote = normalizeSyncDoc({
+      lists: [{ id: 'L1', name: 'Synced list', items: [{ id: 'a', text: 'From iPad' }] }],
+    });
+    const { db, client } = fakeSupabase({ doc: remote, version: 1 }, { id: 'u1', email: 'me@example.com' });
+    vi.spyOn(syncModule, 'getSupabase').mockReturnValue(client);
+
+    render(<App />);
+    expect(await screen.findByText('From iPad')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sync: Synced' })).toBeInTheDocument();
+
+    const itemInput = screen.getByLabelText(/Add item to Synced list/i);
+    fireEvent.change(itemInput, { target: { value: 'From Mac' } });
+    fireEvent.keyDown(itemInput, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => expect(db.row.version).toBe(2), { timeout: 4000 });
+    expect(db.row.doc.lists[0].items.map((i) => i.text)).toEqual(['From iPad', 'From Mac']);
+
+    // Pushing must not echo into another push.
+    await new Promise((r) => setTimeout(r, 2500));
+    expect(db.row.version).toBe(2);
+  }, 10000);
 });

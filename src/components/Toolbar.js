@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import ToolbarMoreMenu from './ui/ToolbarMoreMenu';
 import { VIEW_MODES } from '../utils/constants';
+import { SYNC_STATUS_LABELS } from './modals/SyncModal';
 
 function Toolbar({
   searchRef,
@@ -37,6 +38,8 @@ function Toolbar({
   onItemTemplates,
   onManageTags,
   onToggleNotifications,
+  syncStatus = 'disabled',
+  onOpenSync,
 }) {
   return (
     <>
@@ -132,6 +135,16 @@ function Toolbar({
               🔥 {settings.streakCurrent} day{(settings.streakCurrent || 0) === 1 ? '' : 's'}
             </span>
           ) : null}
+          {syncStatus !== 'disabled' ? (
+            <button
+              type="button"
+              className={`sync-badge sync-badge--${syncStatus}`}
+              onClick={onOpenSync}
+              aria-label={`Sync: ${SYNC_STATUS_LABELS[syncStatus]}`}
+            >
+              {SYNC_STATUS_LABELS[syncStatus]}
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-secondary btn-icon"
@@ -210,6 +223,8 @@ Toolbar.propTypes = {
   onItemTemplates: PropTypes.func.isRequired,
   onManageTags: PropTypes.func.isRequired,
   onToggleNotifications: PropTypes.func.isRequired,
+  syncStatus: PropTypes.string,
+  onOpenSync: PropTypes.func,
 };
 
 export default Toolbar;

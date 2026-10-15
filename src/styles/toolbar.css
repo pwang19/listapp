@@ -128,3 +128,33 @@
   background: var(--border);
   margin: 0.25rem 0;
 }
+
+.sync-badge {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-on-dark);
+  background: rgba(255, 255, 255, 0.12);
+  border: 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.sync-badge::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.sync-badge--synced::before {
+  background: var(--success);
+}
+
+.sync-badge--error::before {
+  background: var(--danger);
+}

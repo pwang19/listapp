@@ -23,6 +23,8 @@ import CommandPalette from './ui/CommandPalette';
 import BulkActionBar from './ui/BulkActionBar';
 import LiveRegion from './ui/LiveRegion';
 import { useLists } from '../hooks/useLists';
+import { useSync } from '../hooks/useSync';
+import SyncModal from './modals/SyncModal';
 import { getAllTags } from '../utils/tags';
 import { listMatchesFilters, hasActiveFilters, filterItemRows } from '../utils/filterItems';
 import { sortListsForDisplay } from '../utils/sortItems';
@@ -97,9 +99,17 @@ function Main() {
     restoreArchived,
     purgeArchived,
     importLists,
+    replaceSyncedState,
     exportBackup,
     clearStorageError,
   } = useLists();
+
+  const syncDoc = useMemo(
+    () => ({ lists, archived, customTags, userTemplates, itemTemplates }),
+    [lists, archived, customTags, userTemplates, itemTemplates]
+  );
+  const sync = useSync(syncDoc, replaceSyncedState);
+  const [syncOpen, setSyncOpen] = useState(false);
 
   const [inputValue, setInputValue] = useState('');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -720,6 +730,8 @@ function Main() {
         onReview={() => setReviewOpen(true)}
         onItemTemplates={() => setItemTemplatesOpen(true)}
         onManageTags={() => setTagManagerOpen(true)}
+        syncStatus={sync.status}
+        onOpenSync={() => setSyncOpen(true)}
         onToggleNotifications={() => {
           updateSettings({ notificationsEnabled: !settings.notificationsEnabled });
           announce(settings.notificationsEnabled ? 'Notifications disabled' : 'Notifications enabled');
@@ -981,6 +993,10 @@ function Main() {
         }}
         onDelete={deleteItemTemplate}
       />
+
+      {sync.enabled ? (
+        <SyncModal isOpen={syncOpen} onClose={() => setSyncOpen(false)} sync={sync} />
+      ) : null}
 
       <TagManagerModal
         isOpen={tagManagerOpen}

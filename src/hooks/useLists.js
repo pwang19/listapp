@@ -694,6 +694,18 @@ export function useLists() {
     [withUndo]
   );
 
+  // Adopt state pulled from another device. `doc` is already normalized by
+  // normalizeSyncDoc; undo history would roll back the other device's work, so drop it.
+  const replaceSyncedState = useCallback((doc) => {
+    dispatch({ type: 'SET_LISTS', lists: doc.lists });
+    setArchived(doc.archived);
+    setCustomTags(doc.customTags);
+    setUserTemplates(doc.userTemplates);
+    setItemTemplates(doc.itemTemplates);
+    setUndoStack([]);
+    setRedoStack([]);
+  }, []);
+
   const exportBackup = useCallback(() => {
     downloadBackup(listsRef.current, archivedRef.current, customTagsRef.current);
     updateSettings({ lastBackupAt: new Date().toISOString() });
@@ -758,6 +770,7 @@ export function useLists() {
     restoreArchived,
     purgeArchived,
     importLists,
+    replaceSyncedState,
     exportBackup,
     clearStorageError: () => setStorageError(null),
   };
