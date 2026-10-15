@@ -1,0 +1,8 @@
+{
+  // Static-assets Worker serving the Vite build at listapp.<account>.workers.dev.
+  "name": "listapp",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}
