@@ -37,7 +37,6 @@ function Toolbar({
   onReview,
   onItemTemplates,
   onManageTags,
-  onToggleNotifications,
   syncStatus = 'disabled',
   onOpenSync,
 }) {
@@ -159,7 +158,6 @@ function Toolbar({
             streaksEnabled={settings.streaksEnabled}
             streakCurrent={settings.streakCurrent}
             density={settings.density || 'comfortable'}
-            notificationsEnabled={settings.notificationsEnabled}
             onTemplates={onTemplates}
             onArchive={onArchive}
             onPrintShare={onPrintShare}
@@ -172,7 +170,6 @@ function Toolbar({
             onReview={onReview}
             onItemTemplates={onItemTemplates}
             onManageTags={onManageTags}
-            onToggleNotifications={onToggleNotifications}
           />
           <button
             type="button"
@@ -222,7 +219,6 @@ Toolbar.propTypes = {
   onReview: PropTypes.func.isRequired,
   onItemTemplates: PropTypes.func.isRequired,
   onManageTags: PropTypes.func.isRequired,
-  onToggleNotifications: PropTypes.func.isRequired,
   syncStatus: PropTypes.string,
   onOpenSync: PropTypes.func,
 };

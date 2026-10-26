@@ -1,8 +1,10 @@
+import { localDateString } from './helpers';
+
 function addDays(dateStr, days) {
   const d = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(d.getTime())) return '';
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localDateString(d);
 }
 
 function isWeekday(dateStr) {
@@ -47,7 +49,7 @@ export function getNextDueDate(item) {
       return '';
   }
 
-  const next = d.toISOString().slice(0, 10);
+  const next = localDateString(d);
   if (item.recurringEndDate && next > item.recurringEndDate) return '';
   return next;
 }

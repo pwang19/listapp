@@ -1,4 +1,5 @@
 import { todayDateString } from './snooze';
+import { localDateString } from './helpers';
 
 /**
  * @param {import('../types').List[]} lists
@@ -34,7 +35,7 @@ export function hasDueOnOrBefore(lists, today = todayDateString()) {
 function previousDay(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return localDateString(d);
 }
 
 /**

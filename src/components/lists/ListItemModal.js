@@ -19,7 +19,6 @@ import Modal from '../modals/Modal';
 import SortableRow from '../ui/SortableRow';
 import { PRIORITIES, RECURRING_OPTIONS } from '../../utils/constants';
 import { getAllTags } from '../../utils/tags';
-import { renderMarkdown } from '../../utils/helpers';
 import { SNOOZE_OPTIONS, isSnoozed } from '../../utils/snooze';
 import { formatHistoryDetail } from '../../utils/itemHistory';
 import ItemExtendedFields from './ItemExtendedFields';

@@ -1,7 +1,28 @@
+// Read-only stand-in for user_state_history: list (newest first) and fetch one doc.
+function historyQuery(db) {
+  const filters = {};
+  const q = {
+    select() { return q; },
+    order() { return q; },
+    limit() { return q; },
+    eq(col, val) { filters[col] = val; return q; },
+    async single() {
+      const row = db.history.find((h) => h.id === filters.id);
+      return row ? { data: { doc: row.doc }, error: null } : { data: null, error: { message: 'not found' } };
+    },
+    then(resolve) {
+      const rows = [...db.history].reverse().map(({ doc, ...meta }) => meta);
+      return resolve({ data: rows, error: null });
+    },
+  };
+  return q;
+}
+
 // In-memory stand-in for the user_state table, covering the query shapes sync.js uses.
-export function fakeSupabase(initial = null, user = null) {
-  const db = { row: initial, writes: 0, beforeWrite: null };
-  const from = () => {
+export function fakeSupabase(initial = null, user = null, history = []) {
+  const db = { row: initial, writes: 0, beforeWrite: null, history };
+  const from = (table) => {
+    if (table === 'user_state_history') return historyQuery(db);
     const filters = {};
     let op = null;
     let payload = null;

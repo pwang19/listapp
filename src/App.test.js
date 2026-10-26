@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import App from './App';
-import { STORAGE_KEY } from './utils/storage';
+import { STORAGE_KEY, SETTINGS_KEY } from './utils/storage';
 import { normalizeLists } from './utils/normalizeLists';
 import * as syncModule from './utils/sync';
 import { normalizeSyncDoc } from './utils/sync';
@@ -116,13 +116,18 @@ describe('sync', () => {
   test('loads lists from the account and pushes local edits back', async () => {
     const remote = normalizeSyncDoc({
       lists: [{ id: 'L1', name: 'Synced list', items: [{ id: 'a', text: 'From iPad' }] }],
+      settings: { staleThresholdDays: 7, savedFilters: [{ id: 'f1', name: 'Errands' }] },
     });
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ darkMode: 'dark' }));
     const { db, client } = fakeSupabase({ doc: remote, version: 1 }, { id: 'u1', email: 'me@example.com' });
     vi.spyOn(syncModule, 'getSupabase').mockReturnValue(client);
 
     render(<App />);
     expect(await screen.findByText('From iPad')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sync: Synced' })).toBeInTheDocument();
+    // Synced settings arrive; device-only ones are untouched.
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(SETTINGS_KEY)).staleThresholdDays).toBe(7));
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY)).darkMode).toBe('dark');
 
     const itemInput = screen.getByLabelText(/Add item to Synced list/i);
     fireEvent.change(itemInput, { target: { value: 'From Mac' } });
@@ -130,9 +135,43 @@ describe('sync', () => {
 
     await waitFor(() => expect(db.row.version).toBe(2), { timeout: 4000 });
     expect(db.row.doc.lists[0].items.map((i) => i.text)).toEqual(['From iPad', 'From Mac']);
+    expect(db.row.doc.settings).toMatchObject({ staleThresholdDays: 7, savedFilters: [{ id: 'f1' }] });
+    expect(db.row.doc.settings.darkMode).toBeUndefined();
 
     // Pushing must not echo into another push.
     await new Promise((r) => setTimeout(r, 2500));
     expect(db.row.version).toBe(2);
   }, 10000);
+
+  test('restores an earlier version from the Sync dialog, and the restore can be undone', async () => {
+    const current = normalizeSyncDoc({
+      lists: [{ id: 'L1', name: 'Groceries', items: [{ id: 'b', text: 'Oops, everything else got deleted' }] }],
+    });
+    const earlier = normalizeSyncDoc({
+      lists: [{ id: 'L1', name: 'Groceries', items: [{ id: 'a', text: 'Eggs' }, { id: 'c', text: 'Bread' }] }],
+    });
+    const { client } = fakeSupabase({ doc: current, version: 5 }, { id: 'u1', email: 'me@example.com' }, [
+      { id: 1, version: 3, list_count: 1, item_count: 2, saved_at: '2026-10-20T15:00:00Z', doc: earlier },
+    ]);
+    vi.spyOn(syncModule, 'getSupabase').mockReturnValue(client);
+
+    render(<App />);
+    expect(await screen.findByText('Oops, everything else got deleted')).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sync: Synced' }));
+    fireEvent.click(screen.getByRole('button', { name: /Earlier versions/ }));
+    expect(await screen.findByText(/1 lists · 2 items/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+
+    const confirm = await screen.findByText(/Replace your lists, archive, and tags/);
+    fireEvent.click(within(confirm.closest('[role="dialog"]')).getByRole('button', { name: 'Restore' }));
+
+    expect(await screen.findByText('Eggs')).toBeInTheDocument();
+    expect(screen.getByText('Bread')).toBeInTheDocument();
+    expect(screen.queryByText('Oops, everything else got deleted')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /undo/i }));
+    expect(await screen.findByText('Oops, everything else got deleted')).toBeInTheDocument();
+    expect(screen.queryByText('Eggs')).not.toBeInTheDocument();
+  });
 });

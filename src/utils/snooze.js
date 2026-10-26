@@ -1,6 +1,8 @@
+import { localDateString } from './helpers';
+
 /** @returns {string} YYYY-MM-DD */
 export function todayDateString() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 
 /** @param {number} daysFromToday */
@@ -8,7 +10,7 @@ export function dateFromToday(daysFromToday) {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + daysFromToday);
-  return d.toISOString().slice(0, 10);
+  return localDateString(d);
 }
 
 /**

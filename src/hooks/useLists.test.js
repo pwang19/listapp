@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, vi } from 'vitest';
+import { test, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useLists } from './useLists';
 import { STORAGE_KEY, ARCHIVE_KEY } from '../utils/storage';

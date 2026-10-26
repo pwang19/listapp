@@ -68,7 +68,7 @@ export function saveArchived(archived) {
   }
 }
 
-const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS = {
   darkMode: 'system',
   lastBackupAt: '',
   dismissedBackupReminder: false,

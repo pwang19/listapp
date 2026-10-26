@@ -1,3 +1,5 @@
+import { localDateString } from './helpers';
+
 /**
  * @param {import('../types').Item} item
  */
@@ -13,7 +15,7 @@ export function getLastTouchedAt(item) {
  * @param {number} thresholdDays
  * @param {string} [todayStr]
  */
-export function isStaleItem(item, thresholdDays = 14, todayStr = new Date().toISOString().slice(0, 10)) {
+export function isStaleItem(item, thresholdDays = 14, todayStr = localDateString()) {
   if (item.complete) return false;
   const touched = getLastTouchedAt(item);
   if (!touched) return false;

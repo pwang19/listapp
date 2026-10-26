@@ -1,5 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getSupabase, syncOnce, hashDoc, loadSyncMeta, saveSyncMeta } from '../utils/sync';
+import {
+  getSupabase,
+  syncOnce,
+  hashDoc,
+  loadSyncMeta,
+  saveSyncMeta,
+  loadSyncBase,
+  saveSyncBase,
+  listHistory,
+  fetchHistoryDoc,
+} from '../utils/sync';
+import { enableReminders, disableReminders } from '../utils/push';
 
 const PUSH_DELAY_MS = 2000;
 
@@ -42,9 +53,16 @@ export function useSync(doc, onRemoteDoc) {
     setStatus('syncing');
     try {
       const local = docRef.current;
-      const result = await syncOnce({ supabase, userId, local, meta: loadSyncMeta() });
+      const result = await syncOnce({
+        supabase,
+        userId,
+        local,
+        meta: loadSyncMeta(),
+        base: loadSyncBase(),
+      });
       if (docRef.current === local) {
         if (result.apply) onRemoteRef.current(result.apply);
+        if (result.synced) saveSyncBase(result.synced);
         saveSyncMeta(result.meta);
       } else {
         // Edited mid-sync: discard this result; the next round merges the edit with whatever was saved.
@@ -113,6 +131,12 @@ export function useSync(doc, onRemoteDoc) {
   );
 
   const signOut = useCallback(async () => {
+    // Otherwise this device would keep getting reminders for an account it left.
+    try {
+      await disableReminders(supabase);
+    } catch {
+      // signing out matters more than tidying the subscription
+    }
     await supabase.auth.signOut();
   }, [supabase]);
 
@@ -122,8 +146,12 @@ export function useSync(doc, onRemoteDoc) {
     error,
     email: session?.user?.email || '',
     syncNow: runSync,
+    listHistory: () => listHistory(supabase),
+    fetchHistoryDoc: (id) => fetchHistoryDoc(supabase, id),
     requestCode,
     verifyCode,
     signOut,
+    enableReminders: () => enableReminders(supabase),
+    disableReminders: () => disableReminders(supabase),
   };
 }

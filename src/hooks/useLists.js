@@ -2,7 +2,6 @@ import { useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import { createId } from '../utils/ids';
 import {
   saveLists,
-  loadArchived,
   saveArchived,
   loadSettings,
   saveSettings,
@@ -702,9 +701,23 @@ export function useLists() {
     setCustomTags(doc.customTags);
     setUserTemplates(doc.userTemplates);
     setItemTemplates(doc.itemTemplates);
+    setSettings((prev) => ({ ...prev, ...doc.settings }));
     setUndoStack([]);
     setRedoStack([]);
   }, []);
+
+  // Restoring an earlier synced version is a user action, so it goes on the undo stack.
+  // (Undo covers lists, archive and tags; templates and settings are left as they are.)
+  const restoreSyncedVersion = useCallback(
+    (doc) => {
+      withUndo('Restored an earlier version', () => {
+        dispatch({ type: 'SET_LISTS', lists: doc.lists });
+        setArchived(doc.archived);
+        setCustomTags(doc.customTags);
+      });
+    },
+    [withUndo]
+  );
 
   const exportBackup = useCallback(() => {
     downloadBackup(listsRef.current, archivedRef.current, customTagsRef.current);
@@ -771,6 +784,7 @@ export function useLists() {
     purgeArchived,
     importLists,
     replaceSyncedState,
+    restoreSyncedVersion,
     exportBackup,
     clearStorageError: () => setStorageError(null),
   };

@@ -120,6 +120,18 @@ export function listsToMarkdown(lists) {
   return parts.join('\n');
 }
 
+/**
+ * Calendar day in the device's time zone, as YYYY-MM-DD.
+ * (toISOString() gives the UTC day, which is wrong in US evenings and east-of-UTC mornings.)
+ * @param {Date} [date]
+ */
+export function localDateString(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function isOverdue(dueDate, complete) {
   if (!dueDate || complete) return false;
   const today = new Date();
@@ -162,7 +174,7 @@ export function listToMarkdown(list) {
 export function getUpcomingItems(lists, { daysAhead = 7 } = {}) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = localDateString(today);
   const end = new Date(today);
   end.setDate(end.getDate() + daysAhead);
   const results = [];

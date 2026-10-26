@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import {
   getMonthGrid,
@@ -7,7 +7,7 @@ import {
   WEEKDAY_LABELS,
 } from '../../utils/calendar';
 import { todayDateString } from '../../utils/snooze';
-import { isOverdue } from '../../utils/helpers';
+import { isOverdue, localDateString } from '../../utils/helpers';
 
 function CalendarView({
   lists,
@@ -25,7 +25,7 @@ function CalendarView({
   const today = todayDateString();
   const itemsByDate = useMemo(() => groupItemsByDueDate(lists), [lists]);
 
-  const toDateStr = (d) => d.toISOString().slice(0, 10);
+  const toDateStr = localDateString;
 
   const shiftAnchor = (direction) => {
     const d = new Date(year, month, day);

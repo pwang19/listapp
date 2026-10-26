@@ -1,5 +1,3 @@
-import { flattenAllItems } from './helpers';
-
 /** @returns {{ listId: string; item: import('../types').Item }|null} */
 export function findItemById(lists, itemId) {
   for (const list of lists) {

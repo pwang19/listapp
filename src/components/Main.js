@@ -24,6 +24,7 @@ import BulkActionBar from './ui/BulkActionBar';
 import LiveRegion from './ui/LiveRegion';
 import { useLists } from '../hooks/useLists';
 import { useSync } from '../hooks/useSync';
+import { pickSyncedSettings } from '../utils/sync';
 import SyncModal from './modals/SyncModal';
 import { getAllTags } from '../utils/tags';
 import { listMatchesFilters, hasActiveFilters, filterItemRows } from '../utils/filterItems';
@@ -100,13 +101,17 @@ function Main() {
     purgeArchived,
     importLists,
     replaceSyncedState,
+    restoreSyncedVersion,
     exportBackup,
     clearStorageError,
   } = useLists();
 
+  // Keyed by content so changes to device-only settings don't produce a new doc.
+  const syncedSettingsJson = JSON.stringify(pickSyncedSettings(settings));
+  const syncedSettings = useMemo(() => JSON.parse(syncedSettingsJson), [syncedSettingsJson]);
   const syncDoc = useMemo(
-    () => ({ lists, archived, customTags, userTemplates, itemTemplates }),
-    [lists, archived, customTags, userTemplates, itemTemplates]
+    () => ({ lists, archived, customTags, userTemplates, itemTemplates, settings: syncedSettings }),
+    [lists, archived, customTags, userTemplates, itemTemplates, syncedSettings]
   );
   const sync = useSync(syncDoc, replaceSyncedState);
   const [syncOpen, setSyncOpen] = useState(false);
@@ -236,11 +241,6 @@ function Main() {
     else expanded.add(folderId);
     updateSettings({ expandedFolderIds: [...expanded] });
   }, [settings.expandedFolderIds, updateSettings]);
-
-  useEffect(() => {
-    if (!settings.notificationsEnabled || !('Notification' in window)) return;
-    if (Notification.permission === 'default') Notification.requestPermission();
-  }, [settings.notificationsEnabled]);
 
   const [pomodoroRemaining, setPomodoroRemaining] = useState(0);
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
@@ -526,9 +526,6 @@ function Main() {
     { id: 'review', label: 'Weekly review', keywords: 'overdue stale', action: () => setReviewOpen(true) },
     { id: 'item-templates', label: 'Item templates', action: () => setItemTemplatesOpen(true) },
     { id: 'new-folder', label: 'New folder', action: () => addFolder('New folder') },
-    { id: 'notifications', label: settings.notificationsEnabled ? 'Disable notifications' : 'Enable notifications', action: () => {
-      updateSettings({ notificationsEnabled: !settings.notificationsEnabled });
-    }},
     { id: 'streaks', label: settings.streaksEnabled ? 'Disable streaks' : 'Enable completion streaks', action: () => {
       const enabling = !settings.streaksEnabled;
       updateSettings({
@@ -552,7 +549,7 @@ function Main() {
     }},
     { id: 'focus-clear', label: 'Exit focus mode', action: () => updateSettings({ focusListId: '' }) },
     { id: 'help', label: 'Keyboard shortcuts', shortcut: '?', action: () => setHelpOpen(true) },
-  ], [exportBackup, updateSettings, settings.darkMode, settings.streaksEnabled, settings.density, settings.notificationsEnabled, viewMode, savedFilters, applySavedFilter, addFolder]);
+  ], [exportBackup, updateSettings, settings.darkMode, settings.streaksEnabled, settings.density, viewMode, savedFilters, applySavedFilter, addFolder]);
 
   const onGlobalKeyDown = useCallback(
     (event) => {
@@ -732,10 +729,6 @@ function Main() {
         onManageTags={() => setTagManagerOpen(true)}
         syncStatus={sync.status}
         onOpenSync={() => setSyncOpen(true)}
-        onToggleNotifications={() => {
-          updateSettings({ notificationsEnabled: !settings.notificationsEnabled });
-          announce(settings.notificationsEnabled ? 'Notifications disabled' : 'Notifications enabled');
-        }}
       />
 
       <BulkActionBar
@@ -995,7 +988,12 @@ function Main() {
       />
 
       {sync.enabled ? (
-        <SyncModal isOpen={syncOpen} onClose={() => setSyncOpen(false)} sync={sync} />
+        <SyncModal
+          isOpen={syncOpen}
+          onClose={() => setSyncOpen(false)}
+          sync={sync}
+          onRestore={restoreSyncedVersion}
+        />
       ) : null}
 
       <TagManagerModal

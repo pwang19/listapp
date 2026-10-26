@@ -1,6 +1,5 @@
 import { filterItems } from './filterItems';
 import { sortItems } from './sortItems';
-import { flattenAllItems } from './helpers';
 
 /**
  * Build flat navigable item keys for keyboard navigation.

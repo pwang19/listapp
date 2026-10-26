@@ -7,7 +7,6 @@ function ToolbarMoreMenu({
   streaksEnabled,
   streakCurrent,
   density,
-  notificationsEnabled,
   onTemplates,
   onArchive,
   onPrintShare,
@@ -20,7 +19,6 @@ function ToolbarMoreMenu({
   onReview,
   onItemTemplates,
   onManageTags,
-  onToggleNotifications,
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
@@ -91,9 +89,6 @@ function ToolbarMoreMenu({
           <button type="button" role="menuitem" onClick={() => run(onToggleDensity)}>
             Density: {density === 'compact' ? 'Compact' : 'Comfortable'}
           </button>
-          <button type="button" role="menuitem" onClick={() => run(onToggleNotifications)}>
-            {notificationsEnabled ? '✓ Notifications' : 'Notifications'}
-          </button>
           <button type="button" role="menuitem" onClick={() => run(onManageTags)}>
             Manage tags
           </button>
@@ -116,7 +111,6 @@ ToolbarMoreMenu.propTypes = {
   streaksEnabled: PropTypes.bool,
   streakCurrent: PropTypes.number,
   density: PropTypes.string,
-  notificationsEnabled: PropTypes.bool,
   onTemplates: PropTypes.func.isRequired,
   onArchive: PropTypes.func.isRequired,
   onPrintShare: PropTypes.func.isRequired,
@@ -129,7 +123,6 @@ ToolbarMoreMenu.propTypes = {
   onReview: PropTypes.func.isRequired,
   onItemTemplates: PropTypes.func.isRequired,
   onManageTags: PropTypes.func.isRequired,
-  onToggleNotifications: PropTypes.func.isRequired,
 };
 
 export default ToolbarMoreMenu;

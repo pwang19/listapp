@@ -22,3 +22,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Supabase function secrets and the generated cron SQL (contain secrets)
+supabase/functions/.env
+supabase/*.local.sql
