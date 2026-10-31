@@ -94,6 +94,7 @@ function ListItemDisplay({
           type="checkbox"
           checked={isComplete}
           onChange={onCheckboxChange}
+          aria-label={`Complete ${name}`}
         />
         <button
           type="button"
