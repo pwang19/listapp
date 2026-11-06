@@ -19,7 +19,7 @@ export class ListsPage {
     this.newListInput = page.getByLabel('Add a new list');
     this.statusFilter = page.getByRole('group', { name: 'Item status filter' });
     this.search = page.getByLabel('Search lists and items');
-    this.toast = page.locator('.toast');
+    this.toast = page.getByTestId('toast');
   }
 
   async goto() {

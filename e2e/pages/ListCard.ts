@@ -8,11 +8,9 @@ export class ListCard {
   readonly archiveCompletedButton: Locator;
 
   constructor(readonly page: Page, readonly name: string) {
-    this.root = page
-      .locator('article.list-card')
-      .filter({ has: page.getByRole('heading', { name, exact: true }) });
+    this.root = page.getByRole('article', { name, exact: true });
     this.newItemInput = this.root.getByLabel(`Add item to ${name}`);
-    this.progress = this.root.locator('.list-progress');
+    this.progress = this.root.getByLabel(/^\d+ of \d+ complete$/);
     this.archiveCompletedButton = this.root.getByRole('button', { name: /^Archive \d+ completed$/ });
   }
 
@@ -28,7 +26,7 @@ export class ListCard {
   // The whole item row, for badges and tag chips that sit beside the name.
   itemRow(text: string): Locator {
     const name = this.page.getByRole('button', { name: `Open details for ${text}` });
-    return this.root.locator('.list-item').filter({ has: name });
+    return this.root.getByRole('listitem').filter({ has: name });
   }
 
   completeCheckbox(text: string): Locator {

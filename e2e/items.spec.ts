@@ -7,9 +7,9 @@ test.describe('items', () => {
 
     const row = errands.itemRow('Buy milk');
     await expect(row).toBeVisible();
-    await expect(row.locator('.tag-chip')).toHaveText(/errand/i);
-    await expect(row.locator('.due-badge')).toHaveText('2026-07-25');
-    await expect(row.locator('.priority-badge')).toHaveText('P2');
+    await expect(row.getByTestId('tag-chip')).toHaveText(/errand/i);
+    await expect(row.getByTestId('due-badge')).toHaveText('2026-07-25');
+    await expect(row.getByTestId('priority-badge')).toHaveText('P2');
   });
 
   test('pasting several lines adds one item per line', async ({ listsPage }) => {
@@ -32,7 +32,7 @@ test.describe('items', () => {
     await dialog.getByRole('button', { name: 'Close' }).click();
     await expect(dialog).toBeHidden();
 
-    await expect(errands.itemRow('Buy milk').locator('.due-badge')).toHaveText('2026-12-01');
+    await expect(errands.itemRow('Buy milk').getByTestId('due-badge')).toHaveText('2026-12-01');
 
     await page.reload();
     dialog = await errands.openItem('Buy milk');

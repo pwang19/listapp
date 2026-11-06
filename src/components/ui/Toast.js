@@ -5,7 +5,7 @@ function Toast({ message, onUndo, onDismiss, undoCount = 0, onRedo, redoCount = 
   if (!message) return null;
 
   return (
-    <div className="toast" role="status" aria-live="polite">
+    <div className="toast" role="status" aria-live="polite" data-testid="toast">
       <span className="toast-message">{message}</span>
       {onUndo ? (
         <button type="button" className="toast-undo" onClick={onUndo}>
