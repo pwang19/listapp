@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import Modal from './Modal';
+import { getAllTags } from '../../utils/tags';
 
 function TagManagerModal({
   isOpen,
@@ -11,13 +12,24 @@ function TagManagerModal({
 }) {
   const [editingId, setEditingId] = useState('');
 
-  if (!isOpen) return null;
-
   const editing = customTags.find((t) => t.id === editingId);
 
+  // Tags are stored on items by id, so renaming only changes the label.
+  const renameTag = (input) => {
+    const label = input.value.trim();
+    const taken = getAllTags(customTags).some(
+      (t) => t.id !== editing.id && t.label.toLowerCase() === label.toLowerCase()
+    );
+    if (!label || taken) {
+      input.value = editing.label;
+      return;
+    }
+    if (label !== editing.label) onUpdateTag(editing.id, { label });
+  };
+
   return (
-    <Modal title="Manage tags" onClose={onClose}>
-      <p className="modal-hint">Set parent tags and comma-separated aliases for quick-add.</p>
+    <Modal isOpen={isOpen} title="Manage tags" onClose={onClose}>
+      <p className="modal-hint">Select a tag to rename it, change its color, set a parent tag or quick-add aliases, or delete it.</p>
       {customTags.length === 0 ? (
         <p className="empty-hint">No custom tags yet. Create tags from an item or quick-add with #tag.</p>
       ) : (
@@ -29,6 +41,7 @@ function TagManagerModal({
                 className="tag-chip"
                 style={{ backgroundColor: `${tag.color}33`, color: tag.color, borderColor: tag.color }}
                 onClick={() => setEditingId(tag.id === editingId ? '' : tag.id)}
+                aria-pressed={tag.id === editingId}
               >
                 {tag.label}
               </button>
@@ -46,8 +59,26 @@ function TagManagerModal({
       )}
 
       {editing ? (
-        <div className="tag-manager-editor">
+        <div className="tag-manager-editor" key={editing.id}>
           <h3 className="tag-manager-editor-title">Edit “{editing.label}”</h3>
+          <label className="field">
+            <span className="field-label">Name</span>
+            <input
+              type="text"
+              className="text-input"
+              defaultValue={editing.label}
+              onBlur={(e) => renameTag(e.target)}
+              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">Color</span>
+            <input
+              type="color"
+              value={/^#[0-9a-f]{6}$/i.test(editing.color) ? editing.color : '#64748b'}
+              onChange={(e) => onUpdateTag(editing.id, { color: e.target.value })}
+            />
+          </label>
           <label className="field">
             <span className="field-label">Parent tag</span>
             <select

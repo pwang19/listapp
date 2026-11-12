@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import App from './App';
-import { STORAGE_KEY, SETTINGS_KEY } from './utils/storage';
+import { STORAGE_KEY, SETTINGS_KEY, CUSTOM_TAGS_KEY } from './utils/storage';
 import { normalizeLists } from './utils/normalizeLists';
 import * as syncModule from './utils/sync';
 import { normalizeSyncDoc } from './utils/sync';
@@ -230,4 +230,23 @@ test('menu tabs run actions and close the menu', () => {
   fireEvent.click(within(dialog).getByRole('button', { name: /Archived/ }));
   expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
   expect(screen.getByRole('dialog')).toBeInTheDocument();
+});
+
+test('manage tags lists custom tags and can rename and delete them', () => {
+  localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify([{ id: 'gym', label: 'Gym', color: '#2f6fed' }]));
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Library' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Manage tags' }));
+  const dialog = screen.getByRole('dialog', { name: 'Manage tags' });
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Gym' }));
+  const name = within(dialog).getByLabelText('Name');
+  fireEvent.change(name, { target: { value: 'Workout' } });
+  fireEvent.blur(name);
+  expect(JSON.parse(localStorage.getItem(CUSTOM_TAGS_KEY))[0]).toMatchObject({ id: 'gym', label: 'Workout' });
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete tag' }));
+  expect(JSON.parse(localStorage.getItem(CUSTOM_TAGS_KEY))).toEqual([]);
+  expect(within(dialog).getByText(/No custom tags yet/)).toBeInTheDocument();
 });
