@@ -39,6 +39,8 @@ import QuickCaptureModal from './modals/QuickCaptureModal';
 import ReviewModal from './modals/ReviewModal';
 import ItemTemplatesModal from './modals/ItemTemplatesModal';
 import TagManagerModal from './modals/TagManagerModal';
+import AppMenuModal from './modals/AppMenuModal';
+import { applyThemeColors, resolveTheme } from '../utils/themes';
 import FocusTimer from './ui/FocusTimer';
 import { buildNavigableItems } from '../utils/keyboardNav';
 import { createId } from '../utils/ids';
@@ -143,6 +145,10 @@ function Main() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [itemTemplatesOpen, setItemTemplatesOpen] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  // Open menu tab, or null when the menu is closed.
+  const [menuTab, setMenuTab] = useState(null);
+  // Unsaved colors shown while editing a custom theme.
+  const [themePreview, setThemePreview] = useState(null);
 
   const searchRef = useRef(null);
   const newListRef = useRef(null);
@@ -161,7 +167,7 @@ function Main() {
     deleteModalOpen || importExportModalOpen || archiveOpen || templatesOpen ||
     printOpen || helpOpen || commandOpen || shareImportOpen || bulkTagModalOpen ||
     saveFilterModalOpen || Boolean(statsListId) || quickCaptureOpen || reviewOpen ||
-    itemTemplatesOpen || tagManagerOpen || Boolean(modalTarget);
+    itemTemplatesOpen || tagManagerOpen || Boolean(menuTab) || Boolean(modalTarget);
 
   const matchingLists = useMemo(
     () => lists.filter((list) => listMatchesFilters(list, { searchQuery, tagFilter, itemFilter })),
@@ -280,19 +286,14 @@ function Main() {
   }, []);
 
   useEffect(() => {
-    const mode = settings.darkMode || 'system';
     const root = document.documentElement;
-    if (mode === 'dark') root.setAttribute('data-theme', 'dark');
-    else if (mode === 'light') root.removeAttribute('data-theme');
-    else {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      root.setAttribute('data-theme', mq.matches ? 'dark' : 'light');
-      const handler = (e) => root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-      mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
-    }
-    return undefined;
-  }, [settings.darkMode]);
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () =>
+      applyThemeColors(root, themePreview || resolveTheme(settings.theme, settings.customThemes, mq.matches).colors);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [settings.theme, settings.customThemes, themePreview]);
 
   useEffect(() => {
     const density = settings.density || 'comfortable';
@@ -366,6 +367,13 @@ function Main() {
     setItemFilter('all');
     announce('Filters cleared');
   };
+
+  const setStreaksEnabled = useCallback((enabled) => {
+    updateSettings({
+      streaksEnabled: enabled,
+      ...(enabled ? {} : { streakCurrent: 0, streakLastGoodDate: '' }),
+    });
+  }, [updateSettings]);
 
   const applySavedFilter = useCallback((filterId) => {
     const filter = savedFilters.find((f) => f.id === filterId);
@@ -526,13 +534,7 @@ function Main() {
     { id: 'review', label: 'Weekly review', keywords: 'overdue stale', action: () => setReviewOpen(true) },
     { id: 'item-templates', label: 'Item templates', action: () => setItemTemplatesOpen(true) },
     { id: 'new-folder', label: 'New folder', action: () => addFolder('New folder') },
-    { id: 'streaks', label: settings.streaksEnabled ? 'Disable streaks' : 'Enable completion streaks', action: () => {
-      const enabling = !settings.streaksEnabled;
-      updateSettings({
-        streaksEnabled: enabling,
-        ...(enabling ? {} : { streakCurrent: 0, streakLastGoodDate: '' }),
-      });
-    }},
+    { id: 'streaks', label: settings.streaksEnabled ? 'Disable streaks' : 'Enable completion streaks', action: () => setStreaksEnabled(!settings.streaksEnabled) },
     { id: 'density', label: `Density: ${settings.density === 'compact' ? 'comfortable' : 'compact'}`, action: () => {
       updateSettings({ density: settings.density === 'compact' ? 'comfortable' : 'compact' });
     }},
@@ -544,12 +546,12 @@ function Main() {
       action: () => applySavedFilter(f.id),
     })),
     { id: 'dark', label: 'Toggle dark mode', action: () => {
-      const next = settings.darkMode === 'dark' ? 'light' : 'dark';
-      updateSettings({ darkMode: next });
+      updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' });
     }},
+    { id: 'settings', label: 'Settings…', keywords: 'preferences theme colors appearance density streaks', action: () => setMenuTab('settings') },
     { id: 'focus-clear', label: 'Exit focus mode', action: () => updateSettings({ focusListId: '' }) },
     { id: 'help', label: 'Keyboard shortcuts', shortcut: '?', action: () => setHelpOpen(true) },
-  ], [exportBackup, updateSettings, settings.darkMode, settings.streaksEnabled, settings.density, viewMode, savedFilters, applySavedFilter, addFolder]);
+  ], [exportBackup, updateSettings, settings.theme, settings.streaksEnabled, settings.density, viewMode, savedFilters, applySavedFilter, addFolder, setStreaksEnabled]);
 
   const onGlobalKeyDown = useCallback(
     (event) => {
@@ -701,32 +703,7 @@ function Main() {
         viewMode={viewMode}
         settings={settings}
         onUpdateSettings={updateSettings}
-        archivedCount={archived.length}
-        bulkMode={bulkMode}
-        onTemplates={() => setTemplatesOpen(true)}
-        onArchive={() => setArchiveOpen(true)}
-        onPrintShare={() => setPrintOpen(true)}
-        onToggleBulk={() => setBulkMode((v) => !v)}
-        onImportExport={() => setImportExportModalOpen(true)}
-        onHelp={() => setHelpOpen(true)}
-        onCommandPalette={() => setCommandOpen(true)}
-        onToggleStreaks={() => {
-          const enabling = !settings.streaksEnabled;
-          updateSettings({
-            streaksEnabled: enabling,
-            ...(enabling ? {} : { streakCurrent: 0, streakLastGoodDate: '' }),
-          });
-          announce(enabling ? 'Streaks enabled' : 'Streaks disabled');
-        }}
-        onToggleDensity={() => {
-          const next = settings.density === 'compact' ? 'comfortable' : 'compact';
-          updateSettings({ density: next });
-          announce(`${next === 'compact' ? 'Compact' : 'Comfortable'} density`);
-        }}
-        onQuickCapture={() => setQuickCaptureOpen(true)}
-        onReview={() => setReviewOpen(true)}
-        onItemTemplates={() => setItemTemplatesOpen(true)}
-        onManageTags={() => setTagManagerOpen(true)}
+        onOpenMenu={() => setMenuTab('actions')}
         syncStatus={sync.status}
         onOpenSync={() => setSyncOpen(true)}
       />
@@ -995,6 +972,34 @@ function Main() {
           onRestore={restoreSyncedVersion}
         />
       ) : null}
+
+      <AppMenuModal
+        tab={menuTab}
+        onTabChange={setMenuTab}
+        onClose={() => setMenuTab(null)}
+        archivedCount={archived.length}
+        bulkMode={bulkMode}
+        onTemplates={() => setTemplatesOpen(true)}
+        onArchive={() => setArchiveOpen(true)}
+        onPrintShare={() => setPrintOpen(true)}
+        onToggleBulk={() => setBulkMode((v) => !v)}
+        onImportExport={() => setImportExportModalOpen(true)}
+        onHelp={() => setHelpOpen(true)}
+        onCommandPalette={() => setCommandOpen(true)}
+        onQuickCapture={() => setQuickCaptureOpen(true)}
+        onReview={() => setReviewOpen(true)}
+        onItemTemplates={() => setItemTemplatesOpen(true)}
+        onManageTags={() => setTagManagerOpen(true)}
+        settingsProps={{
+          theme: settings.theme,
+          customThemes: settings.customThemes,
+          density: settings.density || 'comfortable',
+          streaksEnabled: Boolean(settings.streaksEnabled),
+          onUpdateSettings: updateSettings,
+          onSetStreaksEnabled: setStreaksEnabled,
+          onPreview: setThemePreview,
+        }}
+      />
 
       <TagManagerModal
         isOpen={tagManagerOpen}

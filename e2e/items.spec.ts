@@ -49,7 +49,7 @@ test.describe('items', () => {
     await expect(errands.item('Buy milk')).toBeHidden();
     await expect(errands.progress).toHaveText('0/1');
 
-    await listsPage.moreAction('Archived (1)');
+    await listsPage.menuAction('Library', 'Archived (1)');
     const shelf = listsPage.page.getByRole('dialog', { name: 'Archived items' });
     await expect(shelf.getByText('Buy milk')).toBeVisible();
     await shelf.getByRole('button', { name: 'Restore' }).click();

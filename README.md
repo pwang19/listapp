@@ -16,7 +16,7 @@ Live at **https://listapp.pwang19.workers.dev**.
 - Archive shelf with restore
 - List collapse, pin, duplicate, save as template, share link, export markdown
 - Move and duplicate items between lists
-- Dark mode (toggle or system preference)
+- Settings (☰ Menu → Settings): light, dark, sepia, and forest themes (or follow the system), your own saved color themes, density, and completion streaks
 - Command palette (⌘K)
 - JSON replace/merge import, file upload, drag-drop JSON, auto-backup to Indexed localStorage
 - Print / share as Markdown
@@ -34,11 +34,11 @@ Open the live URL, then:
 - **Mac (Brave/Chrome):** the install icon at the right of the address bar.
 - **iPad:** Share → Add to Home Screen.
 
-Then tap the sync chip next to the 🌙 button and sign in with your email. Sign in from the installed app itself: on iPad, and for Safari's Add to Dock, the installed app has its own storage, separate from the browser's.
+Then tap the sync chip next to the ☰ Menu button and sign in with your email. Sign in from the installed app itself: on iPad, and for Safari's Add to Dock, the installed app has its own storage, separate from the browser's.
 
 ## Sync
 
-Lists, archive, tags, templates, and content preferences (saved views, inbox list, stale threshold, pomodoro length, streaks, last weekly review) sync. Display settings (dark mode, density, view mode, collapsed state) stay per device. Each user has one row in Supabase's `user_state` table holding all of their data. Edits upload about 2 seconds after you stop typing, and the app checks for the other device's changes on launch, on focus, and when it comes back online. See `src/utils/sync.js` and `src/hooks/useSync.js`.
+Lists, archive, tags, templates, and content preferences (saved views, inbox list, stale threshold, pomodoro length, streaks, last weekly review) sync. Display settings (theme and saved color themes, density, view mode, collapsed state) stay per device. Each user has one row in Supabase's `user_state` table holding all of their data. Edits upload about 2 seconds after you stop typing, and the app checks for the other device's changes on launch, on focus, and when it comes back online. See `src/utils/sync.js` and `src/hooks/useSync.js`.
 
 **Conflicts.** Each device keeps the last copy it agreed on with the server (`listapp.syncBase`). If both devices edited while one was offline, the app compares each copy against that shared base:
 - Deletions, moves, archiving, and reordering on either device stick.

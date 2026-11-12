@@ -45,9 +45,11 @@ export class ListsPage {
     await this.page.getByRole('tablist', { name: 'View mode' }).getByRole('tab', { name: view }).click();
   }
 
-  // Runs an entry from the toolbar's "More actions" menu.
-  async moreAction(name: string | RegExp) {
-    await this.page.getByRole('button', { name: 'More actions' }).click();
-    await this.page.getByRole('menuitem', { name }).click();
+  // Runs an entry from a tab of the toolbar's Menu dialog.
+  async menuAction(tab: string, name: string | RegExp) {
+    await this.page.getByRole('button', { name: 'Menu', exact: true }).click();
+    const menu = this.page.getByRole('dialog', { name: 'Menu' });
+    await menu.getByRole('tab', { name: tab }).click();
+    await menu.getByRole('button', { name }).click();
   }
 }
