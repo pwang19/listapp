@@ -17,39 +17,6 @@
   margin-left: auto;
 }
 
-.toolbar-more-wrap {
-  position: relative;
-}
-
-.toolbar-more-menu {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  right: 0;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  min-width: 180px;
-}
-
-.toolbar-more-menu button {
-  background: none;
-  border: none;
-  padding: 0.6rem 0.85rem;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.toolbar-more-menu button:hover {
-  background: rgba(47, 111, 237, 0.1);
-}
-
 .btn-icon {
   min-width: 2.25rem;
   padding-left: 0.55rem;
@@ -121,12 +88,6 @@
   background: rgba(255, 255, 255, 0.12);
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
-}
-
-.toolbar-more-separator {
-  height: 1px;
-  background: var(--border);
-  margin: 0.25rem 0;
 }
 
 .sync-badge {

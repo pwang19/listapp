@@ -94,6 +94,7 @@ function ListItemDisplay({
           type="checkbox"
           checked={isComplete}
           onChange={onCheckboxChange}
+          aria-label={`Complete ${name}`}
         />
         <button
           type="button"
@@ -104,7 +105,7 @@ function ListItemDisplay({
           {name}
         </button>
         {pri && pri.id > 0 ? (
-          <span className="priority-badge" style={{ color: pri.color }} title={pri.label}>
+          <span className="priority-badge" data-testid="priority-badge" style={{ color: pri.color }} title={pri.label}>
             P{pri.id}
           </span>
         ) : null}
@@ -127,6 +128,7 @@ function ListItemDisplay({
         ) : null}
         {dueDate ? (
           <span
+            data-testid="due-badge"
             className={`due-badge${overdue ? ' is-overdue' : ''}${dueSoon ? ' is-due-soon' : ''}`}
           >
             {dueDate}
@@ -142,6 +144,7 @@ function ListItemDisplay({
               <span
                 key={tagId}
                 className="tag-chip"
+                data-testid="tag-chip"
                 style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
               >
                 {tag.label}

@@ -65,8 +65,9 @@ test('normalizeLists rejects non-arrays and assigns ids', () => {
 
 test('import modal shows error for invalid JSON', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /More actions/i }));
-  fireEvent.click(screen.getByRole('menuitem', { name: /Import\/Export/i }));
+  fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Data & help' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Import / Export' }));
 
   const dialog = screen.getByRole('dialog');
   const textarea = within(dialog).getByLabelText(/JSON Data/i);
@@ -118,7 +119,7 @@ describe('sync', () => {
       lists: [{ id: 'L1', name: 'Synced list', items: [{ id: 'a', text: 'From iPad' }] }],
       settings: { staleThresholdDays: 7, savedFilters: [{ id: 'f1', name: 'Errands' }] },
     });
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ darkMode: 'dark' }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme: 'dark' }));
     const { db, client } = fakeSupabase({ doc: remote, version: 1 }, { id: 'u1', email: 'me@example.com' });
     vi.spyOn(syncModule, 'getSupabase').mockReturnValue(client);
 
@@ -127,7 +128,7 @@ describe('sync', () => {
     expect(screen.getByRole('button', { name: 'Sync: Synced' })).toBeInTheDocument();
     // Synced settings arrive; device-only ones are untouched.
     await waitFor(() => expect(JSON.parse(localStorage.getItem(SETTINGS_KEY)).staleThresholdDays).toBe(7));
-    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY)).darkMode).toBe('dark');
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY)).theme).toBe('dark');
 
     const itemInput = screen.getByLabelText(/Add item to Synced list/i);
     fireEvent.change(itemInput, { target: { value: 'From Mac' } });
@@ -136,7 +137,7 @@ describe('sync', () => {
     await waitFor(() => expect(db.row.version).toBe(2), { timeout: 4000 });
     expect(db.row.doc.lists[0].items.map((i) => i.text)).toEqual(['From iPad', 'From Mac']);
     expect(db.row.doc.settings).toMatchObject({ staleThresholdDays: 7, savedFilters: [{ id: 'f1' }] });
-    expect(db.row.doc.settings.darkMode).toBeUndefined();
+    expect(db.row.doc.settings.theme).toBeUndefined();
 
     // Pushing must not echo into another push.
     await new Promise((r) => setTimeout(r, 2500));
@@ -174,4 +175,59 @@ describe('sync', () => {
     expect(await screen.findByText('Oops, everything else got deleted')).toBeInTheDocument();
     expect(screen.queryByText('Eggs')).not.toBeInTheDocument();
   });
+});
+
+test('saves a custom color theme and applies it', () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+  const dialog = screen.getByRole('dialog', { name: 'Menu' });
+  fireEvent.click(within(dialog).getByRole('tab', { name: 'Settings' }));
+
+  fireEvent.click(within(dialog).getByRole('button', { name: /Sepia/ }));
+  expect(document.documentElement.style.getPropertyValue('--bg-panel')).toBe('#fbf6ea');
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Customize colors…' }));
+  fireEvent.change(within(dialog).getByLabelText('Accent'), { target: { value: '#ff0000' } });
+  // Previewed before saving.
+  expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ff0000');
+  fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Red sepia' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save theme' }));
+
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+  expect(saved.customThemes).toHaveLength(1);
+  expect(saved.customThemes[0]).toMatchObject({ name: 'Red sepia', colors: { accent: '#ff0000', 'bg-panel': '#fbf6ea' } });
+  expect(saved.theme).toBe(saved.customThemes[0].id);
+  expect(within(dialog).getByRole('button', { name: /Red sepia/, pressed: true })).toBeInTheDocument();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Red sepia' }));
+  expect(JSON.parse(localStorage.getItem(SETTINGS_KEY))).toMatchObject({ theme: 'system', customThemes: [] });
+});
+
+test('settings modal changes density and streaks', () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+  const dialog = screen.getByRole('dialog', { name: 'Menu' });
+  fireEvent.click(within(dialog).getByRole('tab', { name: 'Settings' }));
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Compact' }));
+  expect(document.documentElement.getAttribute('data-density')).toBe('compact');
+
+  fireEvent.click(within(dialog).getByLabelText('Completion streaks'));
+  expect(JSON.parse(localStorage.getItem(SETTINGS_KEY)).streaksEnabled).toBe(true);
+  fireEvent.click(within(dialog).getByLabelText('Completion streaks'));
+  expect(JSON.parse(localStorage.getItem(SETTINGS_KEY))).toMatchObject({ streaksEnabled: false, streakCurrent: 0 });
+});
+
+test('menu tabs run actions and close the menu', () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+  const dialog = screen.getByRole('dialog', { name: 'Menu' });
+  expect(within(dialog).getByRole('tab', { name: 'Actions' })).toHaveAttribute('aria-selected', 'true');
+
+  fireEvent.keyDown(within(dialog).getByRole('tab', { name: 'Actions' }), { key: 'ArrowRight' });
+  expect(within(dialog).getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
+
+  fireEvent.click(within(dialog).getByRole('button', { name: /Archived/ }));
+  expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
 });

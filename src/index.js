@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { initTelemetry } from './utils/telemetry';
+
+// Before render, so errors during the first render are captured.
+initTelemetry();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

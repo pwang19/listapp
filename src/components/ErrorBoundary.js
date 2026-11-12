@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { downloadBackup, loadLists, loadArchived, loadCustomTags } from '../utils/storage';
+import { trackError } from '../utils/telemetry';
 
 // Without this, any render error unmounts the whole app and leaves a blank screen.
 class ErrorBoundary extends React.Component {
@@ -15,6 +16,8 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('App crashed:', error, info.componentStack);
+    // React swallows errors a boundary catches, so Faro's global handler never sees them.
+    trackError(error, { source: 'ErrorBoundary', componentStack: info.componentStack || '' });
   }
 
   render() {

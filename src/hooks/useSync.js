@@ -11,6 +11,7 @@ import {
   fetchHistoryDoc,
 } from '../utils/sync';
 import { enableReminders, disableReminders } from '../utils/push';
+import { trackEvent, trackError } from '../utils/telemetry';
 
 const PUSH_DELAY_MS = 2000;
 
@@ -51,6 +52,7 @@ export function useSync(doc, onRemoteDoc) {
     }
     runningRef.current = true;
     setStatus('syncing');
+    const startedAt = performance.now();
     try {
       const local = docRef.current;
       const result = await syncOnce({
@@ -70,8 +72,14 @@ export function useSync(doc, onRemoteDoc) {
       }
       setError('');
       setStatus('synced');
+      trackEvent('sync_completed', {
+        // true when this device received changes (pulled or merged with another device)
+        applied: String(Boolean(result.apply)),
+        durationMs: String(Math.round(performance.now() - startedAt)),
+      });
     } catch (err) {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      if (!offline) trackError(err, { source: 'sync' });
       setStatus(offline ? 'offline' : 'error');
       setError(offline ? '' : err?.message || 'Sync failed.');
     } finally {

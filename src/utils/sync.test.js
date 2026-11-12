@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { syncOnce, mergeDocs, hashDoc, normalizeSyncDoc, pickSyncedSettings } from './sync';
 import { fakeSupabase } from '../test/fakeSupabase';
 
@@ -109,6 +109,9 @@ test('hashDoc ignores key order, as jsonb reorders keys', () => {
 });
 
 describe('three-way mergeDocs (with the last synced copy as base)', () => {
+  // Fixtures omit createdAt, so normalizing stamps the current time; pin it so copies match.
+  beforeEach(() => vi.useFakeTimers({ now: new Date('2026-01-01T00:00:00Z') }));
+  afterEach(() => vi.useRealTimers());
   const D = (lists, extra = {}) => normalizeSyncDoc({ lists, ...extra });
   const L = (id, items, extra = {}) => ({ id, name: id, ...extra, items: items.map((it) => (typeof it === 'string' ? { id: it, text: it } : it)) });
   const layout = (d) => Object.fromEntries(d.lists.map((l) => [l.id, l.items.map((i) => i.id)]));
@@ -228,7 +231,7 @@ test('syncOnce merges against the stored base, so a delete made offline sticks',
 test('pickSyncedSettings keeps only synced keys with the right types', () => {
   expect(
     pickSyncedSettings({
-      darkMode: 'dark',
+      theme: 'dark',
       staleThresholdDays: 7,
       pomodoroMinutes: '25',
       savedFilters: [{ id: 'f' }],

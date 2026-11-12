@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useId } from 'react';
 import PropTypes from 'prop-types';
 import {
   DndContext,
@@ -93,6 +93,7 @@ function List({
 }) {
   const [inputValue, setInputValue] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const titleId = useId();
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const iconButtonRef = useRef(null);
 
@@ -162,6 +163,7 @@ function List({
       <article
         className={`list-card${collapsed ? ' is-collapsed' : ''}${pinned ? ' is-pinned' : ''}${menuOpen ? ' is-menu-open' : ''} ${getListThemeClass(theme)}`.trim()}
         data-list-id={listId}
+        aria-labelledby={titleId}
         style={{
           borderTop: `4px solid ${colorMeta.value}`,
           ...getListThemeStyle(colorMeta.value, theme),
@@ -243,7 +245,7 @@ function List({
             >
               <span className="list-icon" aria-hidden="true">{icon}</span>
             </button>
-            <h2 className="list-card-title">
+            <h2 className="list-card-title" id={titleId}>
               <EditableText value={name} onSave={onNameChange} className="list-title" />
             </h2>
             <span className="list-progress" aria-label={`${completedCount} of ${items.length} complete`}>

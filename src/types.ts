@@ -66,7 +66,8 @@
 
 /**
  * @typedef {Object} AppSettings
- * @property {'light'|'dark'|'system'} darkMode
+ * @property {string} theme 'system', a preset theme id, or a custom theme id
+ * @property {{ id: string; name: string; colors: Record<string, string> }[]} customThemes
  * @property {string} lastBackupAt
  * @property {boolean} dismissedBackupReminder
  * @property {string[]} collapsedListIds

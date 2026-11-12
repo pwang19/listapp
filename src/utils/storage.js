@@ -1,3 +1,5 @@
+import { normalizeCustomThemes } from './themes';
+
 export const STORAGE_KEY = 'listapp.lists';
 export const ARCHIVE_KEY = 'listapp.archived';
 export const SETTINGS_KEY = 'listapp.settings';
@@ -69,7 +71,8 @@ export function saveArchived(archived) {
 }
 
 export const DEFAULT_SETTINGS = {
-  darkMode: 'system',
+  theme: 'system',
+  customThemes: [],
   lastBackupAt: '',
   dismissedBackupReminder: false,
   collapsedListIds: [],
@@ -98,8 +101,10 @@ export const DEFAULT_SETTINGS = {
 };
 
 export function loadSettings() {
-  const stored = safeParse(localStorage.getItem(SETTINGS_KEY), {});
-  return { ...DEFAULT_SETTINGS, ...stored };
+  const { darkMode, ...stored } = safeParse(localStorage.getItem(SETTINGS_KEY), {}) || {};
+  // `darkMode` was renamed to `theme` when color themes were added.
+  if (stored.theme === undefined && typeof darkMode === 'string') stored.theme = darkMode;
+  return { ...DEFAULT_SETTINGS, ...stored, customThemes: normalizeCustomThemes(stored.customThemes) };
 }
 
 export function saveSettings(settings) {

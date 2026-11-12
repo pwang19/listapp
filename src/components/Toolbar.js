@@ -1,6 +1,5 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import ToolbarMoreMenu from './ui/ToolbarMoreMenu';
 import { VIEW_MODES } from '../utils/constants';
 import { SYNC_STATUS_LABELS } from './modals/SyncModal';
 
@@ -22,21 +21,7 @@ function Toolbar({
   viewMode,
   settings,
   onUpdateSettings,
-  archivedCount,
-  bulkMode,
-  onTemplates,
-  onArchive,
-  onPrintShare,
-  onToggleBulk,
-  onImportExport,
-  onHelp,
-  onCommandPalette,
-  onToggleStreaks,
-  onToggleDensity,
-  onQuickCapture,
-  onReview,
-  onItemTemplates,
-  onManageTags,
+  onOpenMenu,
   syncStatus = 'disabled',
   onOpenSync,
 }) {
@@ -147,38 +132,12 @@ function Toolbar({
           <button
             type="button"
             className="btn btn-secondary btn-icon"
-            onClick={() => onUpdateSettings({ darkMode: settings.darkMode === 'dark' ? 'light' : 'dark' })}
-            aria-label="Toggle dark mode"
+            onClick={onOpenMenu}
+            aria-label="Menu"
+            aria-haspopup="dialog"
+            title="Menu"
           >
-            {settings.darkMode === 'dark' ? '☀️' : '🌙'}
-          </button>
-          <ToolbarMoreMenu
-            archivedCount={archivedCount}
-            bulkMode={bulkMode}
-            streaksEnabled={settings.streaksEnabled}
-            streakCurrent={settings.streakCurrent}
-            density={settings.density || 'comfortable'}
-            onTemplates={onTemplates}
-            onArchive={onArchive}
-            onPrintShare={onPrintShare}
-            onToggleBulk={onToggleBulk}
-            onImportExport={onImportExport}
-            onHelp={onHelp}
-            onToggleStreaks={onToggleStreaks}
-            onToggleDensity={onToggleDensity}
-            onQuickCapture={onQuickCapture}
-            onReview={onReview}
-            onItemTemplates={onItemTemplates}
-            onManageTags={onManageTags}
-          />
-          <button
-            type="button"
-            className="btn btn-secondary btn-icon"
-            onClick={onCommandPalette}
-            title="Cmd+K"
-            aria-label="Command palette"
-          >
-            ⌘K
+            ☰
           </button>
         </div>
       </div>
@@ -204,21 +163,7 @@ Toolbar.propTypes = {
   viewMode: PropTypes.string.isRequired,
   settings: PropTypes.object.isRequired,
   onUpdateSettings: PropTypes.func.isRequired,
-  archivedCount: PropTypes.number.isRequired,
-  bulkMode: PropTypes.bool.isRequired,
-  onTemplates: PropTypes.func.isRequired,
-  onArchive: PropTypes.func.isRequired,
-  onPrintShare: PropTypes.func.isRequired,
-  onToggleBulk: PropTypes.func.isRequired,
-  onImportExport: PropTypes.func.isRequired,
-  onHelp: PropTypes.func.isRequired,
-  onCommandPalette: PropTypes.func.isRequired,
-  onToggleStreaks: PropTypes.func.isRequired,
-  onToggleDensity: PropTypes.func.isRequired,
-  onQuickCapture: PropTypes.func.isRequired,
-  onReview: PropTypes.func.isRequired,
-  onItemTemplates: PropTypes.func.isRequired,
-  onManageTags: PropTypes.func.isRequired,
+  onOpenMenu: PropTypes.func.isRequired,
   syncStatus: PropTypes.string,
   onOpenSync: PropTypes.func,
 };
