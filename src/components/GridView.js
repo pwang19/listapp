@@ -22,8 +22,7 @@ function GridView({
   searchQuery,
   tagFilter,
   customTags,
-  bulkMode,
-  bulkSelected,
+  selectedKeys,
   filtersActive,
   sensors,
   activeDragId,
@@ -31,7 +30,7 @@ function GridView({
   onDragEnd,
   onOpenTemplates,
   onClearFilters,
-  onBulkToggle,
+  onToggleSelect,
   onOpenItem,
   onDeleteList,
   onDuplicateList,
@@ -91,13 +90,8 @@ function GridView({
         allLists={lists}
         allListsForDeps={matchingLists || lists}
         staleThresholdDays={staleThresholdDays}
-        bulkMode={bulkMode}
-        bulkSelectedIds={new Set(
-          [...bulkSelected.values()]
-            .filter((v) => v.listId === list.id)
-            .map((v) => v.itemId)
-        )}
-        onBulkToggle={onBulkToggle}
+        selectedKeys={selectedKeys}
+        onToggleSelect={onToggleSelect}
         filtersActive={filtersActive}
         onNameChange={(newName) => onRenameList(list.id, newName)}
         onDelete={() => onDeleteList(list.id)}
@@ -200,8 +194,7 @@ GridView.propTypes = {
   searchQuery: PropTypes.string.isRequired,
   tagFilter: PropTypes.string.isRequired,
   customTags: PropTypes.array.isRequired,
-  bulkMode: PropTypes.bool.isRequired,
-  bulkSelected: PropTypes.instanceOf(Map).isRequired,
+  selectedKeys: PropTypes.instanceOf(Set).isRequired,
   filtersActive: PropTypes.bool.isRequired,
   sensors: PropTypes.object.isRequired,
   activeDragId: PropTypes.string,
@@ -209,7 +202,7 @@ GridView.propTypes = {
   onDragEnd: PropTypes.func.isRequired,
   onOpenTemplates: PropTypes.func.isRequired,
   onClearFilters: PropTypes.func.isRequired,
-  onBulkToggle: PropTypes.func.isRequired,
+  onToggleSelect: PropTypes.func.isRequired,
   onOpenItem: PropTypes.func.isRequired,
   onDeleteList: PropTypes.func.isRequired,
   onDuplicateList: PropTypes.func.isRequired,

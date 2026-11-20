@@ -18,6 +18,7 @@
 
 # misc
 .DS_Store
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -30,3 +31,8 @@ yarn-error.log*
 # Supabase function secrets and the generated cron SQL (contain secrets)
 supabase/functions/.env
 supabase/*.local.sql
+
+# WAT framework: disposable intermediates and Google OAuth files
+/.tmp/
+credentials.json
+token.json

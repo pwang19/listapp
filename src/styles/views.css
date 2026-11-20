@@ -1,17 +1,114 @@
+/* Floating selection bar: appears whenever items are selected. */
 .bulk-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  width: max-content;
+  margin-inline: auto;
+  z-index: 50;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  margin-bottom: 1rem;
+  max-width: calc(100vw - 1.5rem);
+  padding: 0.5rem 0.6rem 0.5rem 1rem;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  animation: bulk-bar-in 160ms ease-out;
+}
+
+@keyframes bulk-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bulk-bar {
+    animation: none;
+  }
 }
 
 .bulk-bar-count {
   font-weight: 700;
-  margin-right: 0.5rem;
+}
+
+.bulk-bar-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 0.25rem;
+}
+
+.bulk-bar-close {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.bulk-bar-close:hover,
+.bulk-bar-close:focus-visible {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* Keep the last rows reachable above the floating bar. */
+.main.has-selection {
+  padding-bottom: 6rem;
+}
+
+/* Round select control, distinct from the square complete checkbox. */
+.select-toggle {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 2px solid var(--text-muted);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.list-item:hover .select-toggle,
+.list-item:focus-within .select-toggle,
+.has-selection .select-toggle {
+  opacity: 1;
+}
+
+.select-toggle[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 12px no-repeat;
+}
+
+/* Touch devices have no hover: the gutter appears once long-press selects. */
+@media (hover: none) {
+  .select-toggle {
+    display: none;
+  }
+
+  .has-selection .select-toggle {
+    display: inline-block;
+  }
+}
+
+.list-item.is-selected,
+.all-items-table tr.is-selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .upcoming-view {

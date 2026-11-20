@@ -160,6 +160,18 @@ export function listsReducer(state, action) {
           ),
         };
       });
+    case 'BULK_ADD_TAGS':
+      return updateList(state, action.listId, (list) => ({
+        ...list,
+        items: list.items.map((item) =>
+          action.itemIds.includes(item.id)
+            ? normalizeItem(
+                { ...item, tags: [...new Set([...(item.tags || []), ...action.tagIds])] },
+                action.customTags
+              )
+            : item
+        ),
+      }));
     case 'BULK_MOVE_ITEMS': {
       const fromList = state.find((l) => l.id === action.fromListId);
       if (!fromList || !state.some((l) => l.id === action.toListId)) return state;

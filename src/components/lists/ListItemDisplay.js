@@ -1,4 +1,4 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { getTagById } from '../../utils/tags';
 import { isOverdue, isDueSoon } from '../../utils/helpers';
@@ -13,6 +13,8 @@ const subItemShape = PropTypes.shape({
 });
 
 const SWIPE_THRESHOLD = 60;
+const LONG_PRESS_MS = 450;
+const LONG_PRESS_SLOP = 10;
 
 function ListItemDisplay({
   id,
@@ -28,9 +30,8 @@ function ListItemDisplay({
   onSubItemToggle,
   onAddSubItem,
   sortable = false,
-  bulkMode = false,
-  bulkSelected = false,
-  onBulkToggle,
+  selected = false,
+  onToggleSelect,
   customTags = [],
   keyboardFocused = false,
   itemKey = '',
@@ -43,26 +44,49 @@ function ListItemDisplay({
   const [subInput, setSubInput] = useState('');
   const [offsetX, setOffsetX] = useState(0);
   const touchStart = useRef(null);
+  const longPressTimer = useRef(null);
+  const longPressFired = useRef(false);
   const overdue = isOverdue(dueDate, isComplete);
   const dueSoon = isDueSoon(dueDate, isComplete);
   const pri = PRIORITIES.find((p) => p.id === priority);
   const subCompleteCount = subItems.filter((s) => s.complete).length;
   const subTotal = subItems.length;
 
+  const cancelLongPress = () => {
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+  };
+
+  useEffect(() => cancelLongPress, []);
+
   const handleTouchStart = (e) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    longPressFired.current = false;
+    if (onToggleSelect) {
+      longPressTimer.current = setTimeout(() => {
+        longPressFired.current = true;
+        longPressTimer.current = null;
+        onToggleSelect();
+        navigator.vibrate?.(10);
+      }, LONG_PRESS_MS);
+    }
   };
 
   const handleTouchMove = (e) => {
     if (!touchStart.current) return;
     const dx = e.touches[0].clientX - touchStart.current.x;
     const dy = e.touches[0].clientY - touchStart.current.y;
-    if (Math.abs(dy) > Math.abs(dx)) return;
+    if (Math.abs(dx) > LONG_PRESS_SLOP || Math.abs(dy) > LONG_PRESS_SLOP) cancelLongPress();
+    if (longPressFired.current || Math.abs(dy) > Math.abs(dx)) return;
     setOffsetX(dx);
   };
 
-  const handleTouchEnd = () => {
-    if (offsetX > SWIPE_THRESHOLD) {
+  const handleTouchEnd = (e) => {
+    cancelLongPress();
+    if (longPressFired.current) {
+      // Swallow the click that would otherwise follow the long press.
+      e.preventDefault();
+    } else if (offsetX > SWIPE_THRESHOLD) {
       onCheckboxChange();
     } else if (offsetX < -SWIPE_THRESHOLD && onArchive) {
       onArchive();
@@ -73,20 +97,23 @@ function ListItemDisplay({
 
   const body = (
     <div
-      className={`list-item swipe-item${keyboardFocused ? ' is-keyboard-focused' : ''}`}
+      className={`list-item swipe-item${keyboardFocused ? ' is-keyboard-focused' : ''}${selected ? ' is-selected' : ''}`}
       style={{ transform: offsetX ? `translateX(${offsetX}px)` : undefined }}
       data-item-key={itemKey || undefined}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={cancelLongPress}
     >
       <div className="list-item-main">
-        {bulkMode ? (
-          <input
-            type="checkbox"
-            checked={bulkSelected}
-            onChange={onBulkToggle}
+        {onToggleSelect ? (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={selected}
             aria-label={`Select ${name}`}
+            className="select-toggle"
+            onClick={(e) => onToggleSelect({ range: e.shiftKey })}
           />
         ) : null}
         <input
@@ -99,7 +126,13 @@ function ListItemDisplay({
         <button
           type="button"
           className={`item-name-button${isComplete ? ' is-complete' : ''}`}
-          onClick={onNameClick}
+          onClick={(e) => {
+            if (onToggleSelect && (e.metaKey || e.ctrlKey || e.shiftKey)) {
+              onToggleSelect({ range: e.shiftKey });
+            } else {
+              onNameClick();
+            }
+          }}
           aria-label={`Open details for ${name}`}
         >
           {name}
@@ -229,9 +262,8 @@ ListItemDisplay.propTypes = {
   onSubItemToggle: PropTypes.func,
   onAddSubItem: PropTypes.func,
   sortable: PropTypes.bool,
-  bulkMode: PropTypes.bool,
-  bulkSelected: PropTypes.bool,
-  onBulkToggle: PropTypes.func,
+  selected: PropTypes.bool,
+  onToggleSelect: PropTypes.func,
   customTags: PropTypes.array,
   keyboardFocused: PropTypes.bool,
   itemKey: PropTypes.string,

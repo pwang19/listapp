@@ -58,9 +58,8 @@ function List({
   tagFilter = '',
   customTags = [],
   allLists = [],
-  bulkMode = false,
-  bulkSelectedIds = new Set(),
-  onBulkToggle,
+  selectedKeys = new Set(),
+  onToggleSelect,
   onNameChange,
   onDelete,
   onDuplicate,
@@ -308,9 +307,8 @@ function List({
                           subItems={item.subItems || []}
                           sortable={canReorder}
                           customTags={customTags}
-                          bulkMode={bulkMode}
-                          bulkSelected={bulkSelectedIds.has(item.id)}
-                          onBulkToggle={() => onBulkToggle?.(listId, item.id)}
+                          selected={selectedKeys.has(itemKey)}
+                          onToggleSelect={onToggleSelect ? (opts) => onToggleSelect(listId, item.id, opts) : undefined}
                           onCheckboxChange={() => onItemCheckboxChange(item.id)}
                           onNameClick={() => handleItemNameClick(item.id)}
                           onArchive={() => onDeleteItem(item.id)}
@@ -375,9 +373,8 @@ List.propTypes = {
   tagFilter: PropTypes.string,
   customTags: PropTypes.array,
   allLists: PropTypes.array,
-  bulkMode: PropTypes.bool,
-  bulkSelectedIds: PropTypes.instanceOf(Set),
-  onBulkToggle: PropTypes.func,
+  selectedKeys: PropTypes.instanceOf(Set),
+  onToggleSelect: PropTypes.func,
   onNameChange: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   onDuplicate: PropTypes.func,

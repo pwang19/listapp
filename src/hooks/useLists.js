@@ -39,6 +39,15 @@ import {
   applySnapshot,
 } from '../state/undoStack';
 
+function groupSelectionByList(selection) {
+  const byList = new Map();
+  selection.forEach(({ listId, itemId }) => {
+    if (!byList.has(listId)) byList.set(listId, []);
+    byList.get(listId).push(itemId);
+  });
+  return byList;
+}
+
 export function useLists() {
   const [lists, dispatch] = useReducer(listsReducer, undefined, getInitialLists);
   const [archived, setArchived] = useState(getInitialArchived);
@@ -414,15 +423,38 @@ export function useLists() {
     [withUndo]
   );
 
+  // Bulk ops take a selection of { listId, itemId } spanning any number of
+  // lists and record a single undo entry for the whole operation.
   const bulkUpdateItems = useCallback(
-    (listId, itemIds, patch) => {
-      withUndo(`Updated ${itemIds.length} item(s)`, () => {
-        dispatch({
-          type: 'BULK_UPDATE_ITEMS',
-          listId,
-          itemIds,
-          patch,
-          customTags: customTagsRef.current,
+    (selection, patch) => {
+      const byList = groupSelectionByList(selection);
+      withUndo(`Updated ${selection.length} item(s)`, () => {
+        byList.forEach((itemIds, listId) => {
+          dispatch({
+            type: 'BULK_UPDATE_ITEMS',
+            listId,
+            itemIds,
+            patch,
+            customTags: customTagsRef.current,
+          });
+        });
+      });
+    },
+    [withUndo]
+  );
+
+  const bulkAddTags = useCallback(
+    (selection, tagIds) => {
+      const byList = groupSelectionByList(selection);
+      withUndo(`Tagged ${selection.length} item(s)`, () => {
+        byList.forEach((itemIds, listId) => {
+          dispatch({
+            type: 'BULK_ADD_TAGS',
+            listId,
+            itemIds,
+            tagIds,
+            customTags: customTagsRef.current,
+          });
         });
       });
     },
@@ -430,31 +462,43 @@ export function useLists() {
   );
 
   const bulkMoveItems = useCallback(
-    (fromListId, itemIds, toListId) => {
-      withUndo(`Moved ${itemIds.length} item(s)`, () => {
-        dispatch({ type: 'BULK_MOVE_ITEMS', fromListId, itemIds, toListId });
+    (selection, toListId) => {
+      const byList = groupSelectionByList(selection);
+      byList.delete(toListId);
+      if (!byList.size) return;
+      withUndo(`Moved ${selection.length} item(s)`, () => {
+        byList.forEach((itemIds, fromListId) => {
+          dispatch({ type: 'BULK_MOVE_ITEMS', fromListId, itemIds, toListId });
+        });
       });
     },
     [withUndo]
   );
 
   const bulkArchiveItems = useCallback(
-    (listId, itemIds) => {
-      const list = listsRef.current.find((l) => l.id === listId);
-      if (!list) return;
-      const items = list.items.filter((i) => itemIds.includes(i.id));
-      if (!items.length) return;
-      withUndo(`Archived ${items.length} item(s)`, () => {
-        dispatch({ type: 'BULK_ARCHIVE_ITEMS', listId, itemIds });
-        setArchived((prev) => [
-          ...items.map((item) => ({
-            ...item,
-            archivedAt: new Date().toISOString(),
-            fromListId: list.id,
-            fromListName: list.name,
-          })),
-          ...prev,
-        ]);
+    (selection) => {
+      const archivedEntries = [];
+      const byList = groupSelectionByList(selection);
+      byList.forEach((itemIds, listId) => {
+        const list = listsRef.current.find((l) => l.id === listId);
+        if (!list) return;
+        list.items
+          .filter((i) => itemIds.includes(i.id))
+          .forEach((item) => {
+            archivedEntries.push({
+              ...item,
+              archivedAt: new Date().toISOString(),
+              fromListId: list.id,
+              fromListName: list.name,
+            });
+          });
+      });
+      if (!archivedEntries.length) return;
+      withUndo(`Archived ${archivedEntries.length} item(s)`, () => {
+        byList.forEach((itemIds, listId) => {
+          dispatch({ type: 'BULK_ARCHIVE_ITEMS', listId, itemIds });
+        });
+        setArchived((prev) => [...archivedEntries, ...prev]);
       });
     },
     [withUndo]
@@ -762,6 +806,7 @@ export function useLists() {
     duplicateItem,
     moveItem,
     bulkUpdateItems,
+    bulkAddTags,
     bulkMoveItems,
     bulkArchiveItems,
     toggleItem,

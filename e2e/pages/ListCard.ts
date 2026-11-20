@@ -33,6 +33,11 @@ export class ListCard {
     return this.root.getByRole('checkbox', { name: `Complete ${text}` });
   }
 
+  // Round select control, revealed on hover or once anything is selected.
+  selectToggle(text: string): Locator {
+    return this.root.getByRole('checkbox', { name: `Select ${text}` });
+  }
+
   async openItem(text: string): Promise<Locator> {
     await this.item(text).click();
     return this.page.getByRole('dialog');

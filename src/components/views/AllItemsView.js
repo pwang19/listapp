@@ -8,21 +8,36 @@ function AllItemsView({
   rows,
   customTags,
   onItemClick,
-  bulkMode,
-  selectedIds,
+  selectedKeys = new Set(),
   onToggleSelect,
+  onSelectAll,
+  onClearSelection,
   focusedItemKey,
 }) {
   if (!rows.length) {
     return <p className="empty-state">No items yet. Add items to your lists.</p>;
   }
 
+  const selectedRowCount = rows.filter(({ listId, item }) => selectedKeys.has(`${listId}:${item.id}`)).length;
+  const allSelected = selectedRowCount === rows.length;
+
   return (
     <div className="all-items-view">
       <table className="all-items-table">
         <thead>
           <tr>
-            {bulkMode ? <th scope="col" className="col-check" /> : null}
+            <th scope="col" className="col-check">
+              <input
+                type="checkbox"
+                className="select-checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = selectedRowCount > 0 && !allSelected;
+                }}
+                onChange={() => (allSelected ? onClearSelection?.() : onSelectAll?.())}
+                aria-label={allSelected ? 'Clear selection' : 'Select all items'}
+              />
+            </th>
             <th scope="col">List</th>
             <th scope="col">Item</th>
             <th scope="col">Due</th>
@@ -35,24 +50,24 @@ function AllItemsView({
           {rows.map(({ listId, listName, listIcon, listColor, item }) => {
             const colorMeta = LIST_COLORS.find((c) => c.id === listColor) || LIST_COLORS[0];
             const pri = PRIORITIES.find((p) => p.id === (item.priority || 0));
-            const rowKey = `${listId}-${item.id}`;
-            const focusKey = `${listId}:${item.id}`;
+            const key = `${listId}:${item.id}`;
+            const selected = selectedKeys.has(key);
             return (
               <tr
-                key={rowKey}
-                className={`${item.complete ? 'is-complete' : ''}${focusedItemKey === focusKey ? ' is-keyboard-focused' : ''}`}
-                data-item-key={focusKey}
+                key={key}
+                className={`${item.complete ? 'is-complete' : ''}${focusedItemKey === key ? ' is-keyboard-focused' : ''}${selected ? ' is-selected' : ''}`}
+                data-item-key={key}
               >
-                {bulkMode ? (
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(rowKey)}
-                      onChange={() => onToggleSelect(rowKey, listId, item.id)}
-                      aria-label={`Select ${item.text}`}
-                    />
-                  </td>
-                ) : null}
+                <td className="col-check">
+                  <input
+                    type="checkbox"
+                    className="select-checkbox"
+                    checked={selected}
+                    onChange={() => {}}
+                    onClick={(e) => onToggleSelect?.(listId, item.id, { range: e.shiftKey })}
+                    aria-label={`Select ${item.text}`}
+                  />
+                </td>
                 <td>
                   <span className="all-items-list" style={{ borderLeftColor: colorMeta.value }}>
                     {listIcon} {listName}
@@ -62,7 +77,13 @@ function AllItemsView({
                   <button
                     type="button"
                     className="item-name-button"
-                    onClick={() => onItemClick(listId, item.id)}
+                    onClick={(e) => {
+                      if (onToggleSelect && (e.metaKey || e.ctrlKey || e.shiftKey)) {
+                        onToggleSelect(listId, item.id, { range: e.shiftKey });
+                      } else {
+                        onItemClick(listId, item.id);
+                      }
+                    }}
                   >
                     {item.text}
                   </button>
@@ -108,9 +129,10 @@ AllItemsView.propTypes = {
   rows: PropTypes.arrayOf(PropTypes.object).isRequired,
   customTags: PropTypes.array,
   onItemClick: PropTypes.func.isRequired,
-  bulkMode: PropTypes.bool,
-  selectedIds: PropTypes.instanceOf(Set),
+  selectedKeys: PropTypes.instanceOf(Set),
   onToggleSelect: PropTypes.func,
+  onSelectAll: PropTypes.func,
+  onClearSelection: PropTypes.func,
   focusedItemKey: PropTypes.string,
 };
 

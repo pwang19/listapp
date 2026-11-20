@@ -74,7 +74,7 @@ How it works:
 ### Supabase setup
 
 1. Run `supabase/schema.sql` in the SQL Editor. It creates the tables, the history trigger, and the row-level security policies, and it's safe to re-run.
-2. Put the project URL and publishable key in `.env` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Both are public by design; the data is protected by row-level security, not by keeping the key secret. The sync UI is hidden while either is empty.
+2. Copy `.env.example` to `.env` (git-ignored) and put the project URL and publishable key there as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Both are public by design; the data is protected by row-level security, not by keeping the key secret. The sync UI is hidden while either is empty.
 3. **Authentication → URL Configuration:** set Site URL to the live URL.
 4. **Authentication → Emails:** add `{{ .Token }}` to both the "Magic Link" and "Confirm signup" templates. The app signs in with a typed code rather than a link, because on iPad a link opens in Safari instead of the installed app.
 5. Built-in email only delivers to members of the Supabase organization and allows a few emails per hour, which is enough for personal use. If you switch to Resend SMTP, its test sender `onboarding@resend.dev` only delivers to the Resend account's own email.

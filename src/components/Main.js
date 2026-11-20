@@ -83,6 +83,7 @@ function Main() {
     duplicateItem,
     moveItem,
     bulkUpdateItems,
+    bulkAddTags,
     bulkMoveItems,
     bulkArchiveItems,
     toggleItem,
@@ -130,8 +131,10 @@ function Main() {
   const [tagFilter, setTagFilter] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  const [bulkMode, setBulkMode] = useState(false);
+  // Selected items keyed by `${listId}:${itemId}`. Selecting is not a mode:
+  // any non-empty selection shows the floating action bar.
   const [bulkSelected, setBulkSelected] = useState(new Map());
+  const lastSelectedKey = useRef(null);
   const [liveMessage, setLiveMessage] = useState('');
   const [shareImportOpen, setShareImportOpen] = useState(false);
   const [pendingShareList, setPendingShareList] = useState(null);
@@ -422,66 +425,75 @@ function Main() {
     focusNavItem(navigableItems[nextIndex].key);
   }, [navigableItems, focusedItemKey, focusNavItem]);
 
-  const toggleBulkSelect = (listId, itemId) => {
+  const selectionSupported = viewMode === 'grid' || viewMode === 'all';
+
+  const clearSelection = useCallback(() => {
+    setBulkSelected(new Map());
+    lastSelectedKey.current = null;
+  }, []);
+
+  // Toggle one item; with `range`, select everything between the last toggled
+  // item and this one in the current view's order.
+  const toggleSelect = useCallback((listId, itemId, { range = false } = {}) => {
+    const key = `${listId}:${itemId}`;
+    const anchor = lastSelectedKey.current;
     setBulkSelected((prev) => {
       const next = new Map(prev);
-      const key = `${listId}:${itemId}`;
-      if (next.has(key)) next.delete(key);
-      else next.set(key, { listId, itemId });
+      const from = range && anchor ? navigableItems.findIndex((i) => i.key === anchor) : -1;
+      const to = navigableItems.findIndex((i) => i.key === key);
+      if (from !== -1 && to !== -1) {
+        const [lo, hi] = from < to ? [from, to] : [to, from];
+        navigableItems.slice(lo, hi + 1).forEach((i) => {
+          next.set(i.key, { listId: i.listId, itemId: i.itemId });
+        });
+      } else if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.set(key, { listId, itemId });
+      }
       return next;
     });
-  };
+    lastSelectedKey.current = key;
+  }, [navigableItems]);
 
-  const bulkByList = useMemo(() => {
-    const map = new Map();
-    bulkSelected.forEach(({ listId, itemId }) => {
-      if (!map.has(listId)) map.set(listId, []);
-      map.get(listId).push(itemId);
-    });
-    return map;
-  }, [bulkSelected]);
+  const selectAllVisible = useCallback(() => {
+    setBulkSelected(new Map(
+      navigableItems.map((i) => [i.key, { listId: i.listId, itemId: i.itemId }])
+    ));
+  }, [navigableItems]);
+
+  // Never act on items the current view does not show.
+  useEffect(() => {
+    clearSelection();
+  }, [viewMode, clearSelection]);
+
+  const selection = useMemo(() => [...bulkSelected.values()], [bulkSelected]);
+  const selectedKeys = useMemo(() => new Set(bulkSelected.keys()), [bulkSelected]);
+  const itemsLabel = (n) => `${n} item${n === 1 ? '' : 's'}`;
 
   const handleBulkComplete = () => {
-    bulkByList.forEach((itemIds, listId) => {
-      bulkUpdateItems(listId, itemIds, { complete: true });
-    });
-    setBulkSelected(new Map());
-    announce('Items completed');
+    bulkUpdateItems(selection, { complete: true });
+    announce(`Completed ${itemsLabel(selection.length)}`);
+    clearSelection();
   };
 
   const handleBulkArchive = () => {
-    bulkByList.forEach((itemIds, listId) => {
-      bulkArchiveItems(listId, itemIds);
-    });
-    setBulkSelected(new Map());
-    announce('Items archived');
+    bulkArchiveItems(selection);
+    announce(`Archived ${itemsLabel(selection.length)}`);
+    clearSelection();
   };
 
   const handleBulkMove = (toListId) => {
-    bulkByList.forEach((itemIds, fromListId) => {
-      if (fromListId !== toListId) bulkMoveItems(fromListId, itemIds, toListId);
-    });
-    setBulkSelected(new Map());
-    announce('Items moved');
-  };
-
-  const handleBulkAddTag = () => {
-    setBulkTagModalOpen(true);
+    const target = lists.find((l) => l.id === toListId);
+    bulkMoveItems(selection, toListId);
+    announce(`Moved ${itemsLabel(selection.length)} to ${target?.name || 'list'}`);
+    clearSelection();
   };
 
   const handleBulkTagConfirm = (tagIds) => {
-    bulkByList.forEach((itemIds, listId) => {
-      itemIds.forEach((itemId) => {
-        const list = lists.find((l) => l.id === listId);
-        const item = list?.items.find((i) => i.id === itemId);
-        if (item) {
-          const tags = [...new Set([...(item.tags || []), ...tagIds])];
-          updateItemFields(listId, itemId, { tags });
-        }
-      });
-    });
-    setBulkSelected(new Map());
-    announce('Tags added');
+    bulkAddTags(selection, tagIds);
+    announce(`Tagged ${itemsLabel(selection.length)}`);
+    clearSelection();
   };
 
   const handleKanbanColumnDrop = useCallback((listId, itemId, columnId, groupBy) => {
@@ -538,7 +550,7 @@ function Main() {
     { id: 'density', label: `Density: ${settings.density === 'compact' ? 'comfortable' : 'compact'}`, action: () => {
       updateSettings({ density: settings.density === 'compact' ? 'comfortable' : 'compact' });
     }},
-    { id: 'bulk', label: 'Toggle bulk select', keywords: 'multi select', action: () => setBulkMode((v) => !v) },
+    { id: 'select-all', label: 'Select all visible items', keywords: 'bulk multi select', action: selectAllVisible },
     ...savedFilters.map((f) => ({
       id: `filter-${f.id}`,
       label: `Apply view: ${f.name}`,
@@ -551,7 +563,7 @@ function Main() {
     { id: 'settings', label: 'Settings…', keywords: 'preferences theme colors appearance density streaks', action: () => setMenuTab('settings') },
     { id: 'focus-clear', label: 'Exit focus mode', action: () => updateSettings({ focusListId: '' }) },
     { id: 'help', label: 'Keyboard shortcuts', shortcut: '?', action: () => setHelpOpen(true) },
-  ], [exportBackup, updateSettings, settings.theme, settings.streaksEnabled, settings.density, viewMode, savedFilters, applySavedFilter, addFolder, setStreaksEnabled]);
+  ], [exportBackup, updateSettings, settings.theme, settings.streaksEnabled, settings.density, viewMode, savedFilters, applySavedFilter, addFolder, setStreaksEnabled, selectAllVisible]);
 
   const onGlobalKeyDown = useCallback(
     (event) => {
@@ -586,6 +598,12 @@ function Main() {
 
       if (isTypingTarget(event.target)) return;
 
+      if (event.key === 'Escape' && bulkSelected.size) {
+        event.preventDefault();
+        clearSelection();
+        return;
+      }
+
       const focused = navigableItems.find((item) => item.key === focusedItemKey);
 
       if (event.key === 'j') {
@@ -601,6 +619,11 @@ function Main() {
       if (focused && event.key === 'x') {
         event.preventDefault();
         handleToggleItem(focused.listId, focused.itemId);
+        return;
+      }
+      if (focused && selectionSupported && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        toggleSelect(focused.listId, focused.itemId, { range: event.shiftKey });
         return;
       }
       if (focused && (event.key === 'e' || event.key === 'Enter')) {
@@ -636,7 +659,8 @@ function Main() {
       }
     },
     [anyModalOpen, commandOpen, undoStack.length, redoStack.length, applyUndo, applyRedo, viewMode,
-      navigableItems, focusedItemKey, navigateItems, handleToggleItem, openItemModal]
+      navigableItems, focusedItemKey, navigateItems, handleToggleItem, openItemModal,
+      bulkSelected.size, clearSelection, selectionSupported, toggleSelect]
   );
 
   useEffect(() => {
@@ -665,7 +689,7 @@ function Main() {
   };
 
   return (
-    <div className="main" ref={fileDropRef} data-density={settings.density || 'comfortable'}>
+    <div className={`main${bulkSelected.size ? ' has-selection' : ''}`} ref={fileDropRef} data-density={settings.density || 'comfortable'}>
       <LiveRegion message={liveMessage} />
 
       {storageError ? (
@@ -710,12 +734,14 @@ function Main() {
 
       <BulkActionBar
         selectedCount={bulkSelected.size}
+        visibleCount={navigableItems.length}
         lists={lists}
+        onSelectAll={selectAllVisible}
         onComplete={handleBulkComplete}
         onArchive={handleBulkArchive}
         onMove={handleBulkMove}
-        onAddTag={handleBulkAddTag}
-        onClear={() => setBulkSelected(new Map())}
+        onAddTag={() => setBulkTagModalOpen(true)}
+        onClear={clearSelection}
       />
 
       {viewMode === 'grid' ? (
@@ -728,8 +754,7 @@ function Main() {
           searchQuery={searchQuery}
           tagFilter={tagFilter}
           customTags={customTags}
-          bulkMode={bulkMode}
-          bulkSelected={bulkSelected}
+          selectedKeys={selectedKeys}
           filtersActive={filtersActive}
           sensors={sensors}
           activeDragId={activeDragId}
@@ -737,7 +762,7 @@ function Main() {
           onDragEnd={handleListsDragEnd}
           onOpenTemplates={() => setTemplatesOpen(true)}
           onClearFilters={clearFilters}
-          onBulkToggle={toggleBulkSelect}
+          onToggleSelect={toggleSelect}
           onOpenItem={openItemModal}
           onDeleteList={(listId) => { setListToDelete(listId); setDeleteModalOpen(true); }}
           onDuplicateList={duplicateList}
@@ -781,9 +806,10 @@ function Main() {
           rows={allItemRows}
           customTags={customTags}
           onItemClick={openItemModal}
-          bulkMode={bulkMode}
-          selectedIds={new Set([...bulkSelected.keys()])}
-          onToggleSelect={(key, listId, itemId) => toggleBulkSelect(listId, itemId)}
+          selectedKeys={selectedKeys}
+          onToggleSelect={toggleSelect}
+          onSelectAll={selectAllVisible}
+          onClearSelection={clearSelection}
           focusedItemKey={focusedItemKey}
         />
       ) : null}
@@ -978,11 +1004,9 @@ function Main() {
         onTabChange={setMenuTab}
         onClose={() => setMenuTab(null)}
         archivedCount={archived.length}
-        bulkMode={bulkMode}
         onTemplates={() => setTemplatesOpen(true)}
         onArchive={() => setArchiveOpen(true)}
         onPrintShare={() => setPrintOpen(true)}
-        onToggleBulk={() => setBulkMode((v) => !v)}
         onImportExport={() => setImportExportModalOpen(true)}
         onHelp={() => setHelpOpen(true)}
         onCommandPalette={() => setCommandOpen(true)}
@@ -1062,10 +1086,12 @@ function Main() {
         message={`Keyboard shortcuts:
 / search · n new list · t templates · a archived · z undo
 j/k navigate items · x complete · e/Enter open details
+s select · ⇧S select range · Esc clear selection
 ⌘Z undo · ⌘⇧Z redo · ⌘K command palette
 Click item names for details. Drag ⋮⋮ handles to reorder.
 Quick add: Buy milk #errand !2026-07-25 !p2
-Swipe right on mobile to complete, left to archive.`}
+Hover an item and click ○ to select it; shift-click to select a range.
+Swipe right on mobile to complete, left to archive; long-press to select.`}
         confirmLabel="Got it"
         onConfirm={() => setHelpOpen(false)}
         onCancel={() => setHelpOpen(false)}
