@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { syncOnce, mergeDocs, hashDoc, normalizeSyncDoc, pickSyncedSettings } from './sync';
+import { syncOnce, mergeDocs, hashDoc, normalizeSyncDoc, pickSyncedSettings, updateRemoteDoc } from './sync';
 import { fakeSupabase } from '../test/fakeSupabase';
 
 const doc = (lists) => normalizeSyncDoc({ lists });
@@ -238,4 +238,36 @@ test('pickSyncedSettings keeps only synced keys with the right types', () => {
       inboxListId: null,
     })
   ).toEqual({ staleThresholdDays: 7, savedFilters: [{ id: 'f' }] });
+});
+
+describe('updateRemoteDoc', () => {
+  const addList = (name) => (d) => ({ doc: { ...d, lists: [...d.lists, { id: name, name, items: [] }] }, result: name });
+
+  test('creates the saved doc when there is none', async () => {
+    const { db, client } = fakeSupabase();
+    expect(await updateRemoteDoc(client, 'u', addList('L1'))).toBe('L1');
+    expect(db.row.version).toBe(1);
+    expect(db.row.doc.lists.map((l) => l.id)).toEqual(['L1']);
+  });
+
+  test('re-applies the change on a fresh copy when another device saves first', async () => {
+    const { db, client } = fakeSupabase({ doc: doc([list('L1', ['a'])]), version: 3 });
+    db.beforeWrite = () => {
+      db.row = { doc: doc([list('L1', ['a', 'other'])]), version: 4 };
+    };
+    await updateRemoteDoc(client, 'u', addList('L2'));
+    expect(db.row.version).toBe(5);
+    expect(itemIds(db.row.doc)).toEqual(['a', 'other']);
+    expect(db.row.doc.lists.map((l) => l.id)).toEqual(['L1', 'L2']);
+  });
+
+  test('normalizes what it saves and refuses a doc without lists', async () => {
+    const { db, client } = fakeSupabase({ doc: doc([]), version: 1 });
+    await updateRemoteDoc(client, 'u', (d) => ({
+      doc: { ...d, lists: [{ id: 'L1', name: 'X', items: [{ text: 'a', priority: 9, dueDate: 'soon' }] }] },
+    }));
+    expect(db.row.doc.lists[0].items[0]).toMatchObject({ priority: 0, dueDate: '' });
+    await expect(updateRemoteDoc(client, 'u', (d) => ({ doc: { ...d, lists: null } }))).rejects.toThrow(/without lists/);
+    expect(db.row.version).toBe(2);
+  });
 });

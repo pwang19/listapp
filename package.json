@@ -8,14 +8,17 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@grafana/faro-web-sdk": "^2.13.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@supabase/supabase-js": "^2.118.0",
     "prop-types": "^15.8.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zod": "^4.6.7"
   },
   "scripts": {
     "start": "vite",
     "build": "vite build",
+    "build:mcp": "vite build --ssr mcp/server.js --outDir mcp/dist",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

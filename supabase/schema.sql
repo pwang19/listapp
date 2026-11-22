@@ -118,3 +118,16 @@ create policy "Users manage their own push subscriptions"
   on public.push_subscriptions for all to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
+
+-- Realtime: open devices hear about saves from elsewhere (another device, an
+-- agent through mcp/server.js) and sync at once. Row-level security limits each
+-- user to their own row's events.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'user_state'
+  ) then
+    alter publication supabase_realtime add table public.user_state;
+  end if;
+end $$;

@@ -55,6 +55,19 @@ export function fakeSupabase(initial = null, user = null, history = []) {
     async getSession() { return { data: { session: user ? { user } : null } }; },
     onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
   };
-  return { db, client: { from, auth } };
+  // Realtime: db.notify() plays a row change to subscribed handlers.
+  db.listeners = new Set();
+  db.notify = () => db.listeners.forEach((fn) => fn({}));
+  const channel = () => {
+    const handlers = [];
+    const ch = {
+      on(_type, _filter, fn) { handlers.push(fn); return ch; },
+      subscribe() { handlers.forEach((fn) => db.listeners.add(fn)); return ch; },
+      unsubscribe() { handlers.forEach((fn) => db.listeners.delete(fn)); },
+    };
+    return ch;
+  };
+  const removeChannel = (ch) => ch.unsubscribe();
+  return { db, client: { from, auth, channel, removeChannel } };
 }
 

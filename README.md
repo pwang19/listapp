@@ -80,6 +80,17 @@ How it works:
 5. Built-in email only delivers to members of the Supabase organization and allows a few emails per hour, which is enough for personal use. If you switch to Resend SMTP, its test sender `onboarding@resend.dev` only delivers to the Resend account's own email.
 6. Once your devices are signed in, turn off **Allow new users to sign up** (Authentication → Sign In / Providers).
 
+### Agent access (MCP)
+
+Agents in your other local projects (Claude Code in `market-researcher`, for example) can read and edit your lists through a small MCP server in `mcp/`. It signs in as you, so row-level security still applies. It saves with the same version check as the app, and open devices show its edits right away (Realtime) and merge them with any unsynced edits of their own.
+
+1. Re-run `supabase/schema.sql` once: it adds `user_state` to the Realtime publication.
+2. `npm run build:mcp`: bundles `mcp/dist/server.js`, with the Supabase URL and key from `.env` built in. Rebuild after changing `mcp/`, `src/utils/sync.js` or the reducer.
+3. `node mcp/dist/server.js login`: sends a sign-in code to your email (existing accounts only). The session is saved in `~/.config/listapp/agent-session.json` (owner-only); delete that file to sign the agent out.
+4. Register the server for every project: `claude mcp add --scope user listapp -- node /Users/peterwang/code/listapp/mcp/dist/server.js`
+
+Tools: `list_lists`, `get_list`, `create_list`, `add_items`, `update_item`, `delete_item`, `update_list`, `delete_list`. Lists can be named by id or by exact name. A list or item an agent deleted can be brought back from **Sync → Earlier versions**.
+
 ## Run locally
 
 ```bash
@@ -97,6 +108,7 @@ Open [http://localhost:5173](http://localhost:5173).
 | `npm test` | Vitest + Testing Library |
 | `npm run lint` | ESLint (errors on undefined names and hook misuse; runs in CI) |
 | `npm run build` | Production build in `dist/` |
+| `npm run build:mcp` | Bundle the agent MCP server to `mcp/dist/server.js` |
 | `npm run preview` | Preview production build |
 | `npm run deploy` | Build and deploy to Cloudflare (`wrangler login` first) |
 

@@ -122,6 +122,23 @@ export function useSync(doc, onRemoteDoc) {
     };
   }, [userId, runSync]);
 
+  // Pick up saves from elsewhere (another device, an agent) as they happen.
+  // Needs user_state in the supabase_realtime publication (supabase/schema.sql).
+  useEffect(() => {
+    if (!supabase || !userId) return undefined;
+    const channel = supabase
+      .channel(`user_state:${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_state', filter: `user_id=eq.${userId}` },
+        () => runSync()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, userId, runSync]);
+
   const requestCode = useCallback(
     async (email) => {
       const { error: err } = await supabase.auth.signInWithOtp({ email });

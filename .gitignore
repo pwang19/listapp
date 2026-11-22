@@ -36,3 +36,6 @@ supabase/*.local.sql
 /.tmp/
 credentials.json
 token.json
+
+# Bundled agent MCP server (npm run build:mcp)
+/mcp/dist

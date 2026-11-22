@@ -281,6 +281,24 @@ async function pushRemote(supabase, userId, doc, baseVersion) {
 }
 
 /**
+ * Read-change-write of the saved doc for clients without a local copy (the agent
+ * MCP server, see mcp/server.js). `change(doc)` gets a normalized doc (empty if
+ * none is saved yet) and returns `{ doc, result }`. It is re-run on a fresh copy
+ * when another device saves first. Devices pick the change up like any other
+ * device's edit, merging it with their own unsynced edits.
+ */
+export async function updateRemoteDoc(supabase, userId, change) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const remote = await fetchRemote(supabase, userId);
+    const { doc, result } = change(remote ? remote.doc : normalizeSyncDoc());
+    if (!doc || !Array.isArray(doc.lists)) throw new Error('Refusing to save a doc without lists.');
+    const version = await pushRemote(supabase, userId, normalizeSyncDoc(doc), remote ? remote.version : null);
+    if (version != null) return result;
+  }
+  throw new Error('Kept conflicting with another device saving. Try again.');
+}
+
+/**
  * One sync round. `local` must be a normalized doc; `base` is the last synced
  * doc (see loadSyncBase). Returns the new meta, `synced` (the doc both sides now
  * agree on, to store as the next base) and, when the user should see something

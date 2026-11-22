@@ -144,6 +144,22 @@ describe('sync', () => {
     expect(db.row.version).toBe(2);
   }, 10000);
 
+  test('shows a save made elsewhere (e.g. by an agent) as soon as it lands', async () => {
+    const remote = normalizeSyncDoc({ lists: [{ id: 'L1', name: 'Todos', items: [{ id: 'a', text: 'First' }] }] });
+    const { db, client } = fakeSupabase({ doc: remote, version: 1 }, { id: 'u1', email: 'me@example.com' });
+    vi.spyOn(syncModule, 'getSupabase').mockReturnValue(client);
+
+    render(<App />);
+    expect(await screen.findByText('First')).toBeInTheDocument();
+    await screen.findByRole('button', { name: 'Sync: Synced' });
+
+    await syncModule.updateRemoteDoc(client, 'u1', (d) => ({
+      doc: { ...d, lists: [...d.lists, { id: 'L2', name: 'From agent', items: [{ text: 'Agent todo' }] }] },
+    }));
+    db.notify();
+    expect(await screen.findByText('Agent todo')).toBeInTheDocument();
+  });
+
   test('restores an earlier version from the Sync dialog, and the restore can be undone', async () => {
     const current = normalizeSyncDoc({
       lists: [{ id: 'L1', name: 'Groceries', items: [{ id: 'b', text: 'Oops, everything else got deleted' }] }],
