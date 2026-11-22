@@ -54,14 +54,26 @@ function connect() {
   });
 }
 
+// A sign-in link (Supabase's {{ .ConfirmationURL }}) carries the hashed token as
+// `token` and the kind of email as `type`; a typed code is the plain token.
+function otpParams(email, answer) {
+  if (!/^https?:\/\//i.test(answer)) return { email, token: answer, type: 'email' };
+  const params = new URL(answer).searchParams;
+  const tokenHash = params.get('token') || params.get('token_hash');
+  if (!tokenHash) throw new Error('That link has no sign-in token in it.');
+  return { token_hash: tokenHash, type: params.get('type') || 'email' };
+}
+
 async function login(supabase) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
     const email = (await rl.question('Email: ')).trim();
     const sent = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
     if (sent.error) throw sent.error;
-    const token = (await rl.question('Code from the email: ')).trim();
-    const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+    console.log('The email has a code or a sign-in link, depending on its template.');
+    console.log("For a link, copy it (right-click → Copy Link) and paste it here. Don't open it: that uses it up.");
+    const answer = (await rl.question('Code or link: ')).trim();
+    const { error } = await supabase.auth.verifyOtp(otpParams(email, answer));
     if (error) throw error;
     console.log(`Signed in as ${email}. Session saved to ${SESSION_FILE}`);
   } finally {
