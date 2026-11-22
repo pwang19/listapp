@@ -9,6 +9,14 @@ export const LIST_COLORS = [
 
 export const LIST_ICONS = ['📋', '🛒', '✈️', '📚', '🏠', '💼', '🎯', '✨'];
 
+// How many grid columns a list card spans. Order matters: the resize handle
+// steps through it.
+export const LIST_WIDTHS = [
+  { id: 'normal', label: 'Normal' },
+  { id: 'wide', label: 'Wide' },
+  { id: 'full', label: 'Full row' },
+];
+
 export const TAG_PALETTE = [
   { id: 'work', label: 'Work', color: '#2f6fed' },
   { id: 'personal', label: 'Personal', color: '#0d9488' },

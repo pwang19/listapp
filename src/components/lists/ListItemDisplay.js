@@ -95,6 +95,9 @@ function ListItemDisplay({
     touchStart.current = null;
   };
 
+  const hasMeta =
+    (pri && pri.id > 0) || estimateMinutes > 0 || isBlocked || isStale || subTotal > 0 || Boolean(dueDate);
+
   const body = (
     <div
       className={`list-item swipe-item${keyboardFocused ? ' is-keyboard-focused' : ''}${selected ? ' is-selected' : ''}`}
@@ -123,50 +126,56 @@ function ListItemDisplay({
           onChange={onCheckboxChange}
           aria-label={`Complete ${name}`}
         />
-        <button
-          type="button"
-          className={`item-name-button${isComplete ? ' is-complete' : ''}`}
-          onClick={(e) => {
-            if (onToggleSelect && (e.metaKey || e.ctrlKey || e.shiftKey)) {
-              onToggleSelect({ range: e.shiftKey });
-            } else {
-              onNameClick();
-            }
-          }}
-          aria-label={`Open details for ${name}`}
-        >
-          {name}
-        </button>
-        {pri && pri.id > 0 ? (
-          <span className="priority-badge" data-testid="priority-badge" style={{ color: pri.color }} title={pri.label}>
-            P{pri.id}
-          </span>
-        ) : null}
-        {estimateMinutes > 0 ? (
-          <span className="estimate-badge" title="Time estimate">{formatEstimate(estimateMinutes)}</span>
-        ) : null}
-        {isBlocked ? (
-          <span className="blocked-badge" title="Blocked">🔒</span>
-        ) : null}
-        {isStale ? (
-          <span className="stale-badge" title="Stale item">💤</span>
-        ) : null}
-        {subTotal > 0 ? (
-          <span
-            className={`subitem-progress${subCompleteCount === subTotal ? ' is-complete' : ''}`}
-            title={`${subCompleteCount} of ${subTotal} sub-items done`}
+        <div className="item-content">
+          <button
+            type="button"
+            className={`item-name-button${isComplete ? ' is-complete' : ''}`}
+            onClick={(e) => {
+              if (onToggleSelect && (e.metaKey || e.ctrlKey || e.shiftKey)) {
+                onToggleSelect({ range: e.shiftKey });
+              } else {
+                onNameClick();
+              }
+            }}
+            aria-label={`Open details for ${name}`}
           >
-            {subCompleteCount}/{subTotal}
-          </span>
-        ) : null}
-        {dueDate ? (
-          <span
-            data-testid="due-badge"
-            className={`due-badge${overdue ? ' is-overdue' : ''}${dueSoon ? ' is-due-soon' : ''}`}
-          >
-            {dueDate}
-          </span>
-        ) : null}
+            {name}
+          </button>
+          {hasMeta ? (
+            <span className="item-meta">
+            {pri && pri.id > 0 ? (
+              <span className="priority-badge" data-testid="priority-badge" style={{ color: pri.color }} title={pri.label}>
+                P{pri.id}
+              </span>
+            ) : null}
+            {estimateMinutes > 0 ? (
+              <span className="estimate-badge" title="Time estimate">{formatEstimate(estimateMinutes)}</span>
+            ) : null}
+            {isBlocked ? (
+              <span className="blocked-badge" title="Blocked">🔒</span>
+            ) : null}
+            {isStale ? (
+              <span className="stale-badge" title="Stale item">💤</span>
+            ) : null}
+            {subTotal > 0 ? (
+              <span
+                className={`subitem-progress${subCompleteCount === subTotal ? ' is-complete' : ''}`}
+                title={`${subCompleteCount} of ${subTotal} sub-items done`}
+              >
+                {subCompleteCount}/{subTotal}
+              </span>
+            ) : null}
+            {dueDate ? (
+              <span
+                data-testid="due-badge"
+                className={`due-badge${overdue ? ' is-overdue' : ''}${dueSoon ? ' is-due-soon' : ''}`}
+              >
+                {dueDate}
+              </span>
+            ) : null}
+            </span>
+          ) : null}
+        </div>
       </div>
       {tags.length > 0 ? (
         <div className="tag-row">

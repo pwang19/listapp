@@ -43,6 +43,12 @@ export class ListCard {
     return this.page.getByRole('dialog');
   }
 
+  async setWidth(label: 'Normal' | 'Wide' | 'Full row') {
+    await this.root.getByRole('button', { name: 'Customize list appearance and sort' }).click();
+    await this.page.getByRole('group', { name: 'List width' }).getByRole('button', { name: label }).click();
+    await this.page.keyboard.press('Escape');
+  }
+
   async delete() {
     await this.root.getByRole('button', { name: 'List menu' }).click();
     await this.root.getByRole('menuitem', { name: `Delete list ${this.name}` }).click();

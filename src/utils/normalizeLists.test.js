@@ -2,6 +2,15 @@ import { describe, test, expect } from 'vitest';
 import { normalizeLists, migrateLegacyPriority } from './normalizeLists';
 
 describe('normalizeLists', () => {
+  test('keeps a valid list width and defaults anything else to normal', () => {
+    const result = normalizeLists([
+      { name: 'A', width: 'wide' },
+      { name: 'B', width: 'huge' },
+      { name: 'C' },
+    ]);
+    expect(result.lists.map((l) => l.width)).toEqual(['wide', 'normal', 'normal']);
+  });
+
   test('returns error for non-array', () => {
     const result = normalizeLists(null);
     expect(result.ok).toBe(false);

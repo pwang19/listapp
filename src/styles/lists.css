@@ -19,6 +19,7 @@
 }
 
 .folder-children {
+  container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 1.5rem;
@@ -153,6 +154,7 @@
 }
 
 .lists-grid {
+  container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 1.5rem;
@@ -258,10 +260,14 @@
 }
 
 .list-card-title {
-  margin: 0 1.5rem 1rem 0;
+  margin: 0;
+  min-width: 0;
   text-align: center;
   color: var(--text-primary);
   font-size: 1.35rem;
+  line-height: 1.25;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .list-card-delete {
@@ -296,8 +302,41 @@
 
 .list-item-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+}
+
+.list-item-main > .select-toggle,
+.list-item-main > input[type='checkbox'] {
+  flex: none;
+  margin-top: 0.2em;
+}
+
+/* Text keeps most of the row; badges stay beside it when there is room
+   and wrap onto their own line underneath in narrow cards. */
+.item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.5rem;
+  row-gap: 0.2rem;
+}
+
+.item-content .item-name-button {
+  flex: 1 1 14ch;
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.item-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .item-name-button {
@@ -371,7 +410,9 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-right: 1.5rem;
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0.5rem;
 }
 
 .list-icon {
@@ -506,7 +547,6 @@
 }
 
 .due-badge {
-  margin-left: auto;
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -565,6 +605,8 @@
   color: var(--text-muted);
   font-weight: 600;
   margin-left: 0.5rem;
+  flex: none;
+  white-space: nowrap;
 }
 
 .list-card.is-pinned {
@@ -682,4 +724,57 @@
 [data-density='compact'] .all-items-table th,
 [data-density='compact'] .all-items-table td {
   padding: 0.35rem 0.5rem;
+}
+
+/* List width: wide spans two columns once the grid has room for two
+   (2 x 280px + 1.5rem gap), full always takes the whole row. */
+.list-sortable.is-width-full {
+  grid-column: 1 / -1;
+}
+
+@container (min-width: 584px) {
+  .list-sortable.is-width-wide {
+    grid-column: span 2;
+  }
+}
+
+.width-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.list-resize-handle {
+  position: absolute;
+  top: 50%;
+  right: -1px;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: var(--border);
+  cursor: ew-resize;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 2;
+}
+
+.list-card:hover .list-resize-handle,
+.list-resize-handle:focus-visible,
+.list-resize-handle:active {
+  opacity: 1;
+}
+
+.list-resize-handle:hover,
+.list-resize-handle:active {
+  background: var(--accent);
+}
+
+@media (hover: none) {
+  .list-resize-handle {
+    display: none;
+  }
 }

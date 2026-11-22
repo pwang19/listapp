@@ -70,13 +70,18 @@ function GridView({
   });
 
   const renderList = (list) => (
-    <SortableRow key={list.id} id={list.id} className="list-sortable">
+    <SortableRow
+      key={list.id}
+      id={list.id}
+      className={`list-sortable is-width-${list.width || 'normal'}`}
+    >
       <List
         id={list.id}
         name={list.name}
         color={list.color}
         icon={list.icon}
         theme={list.theme || 'none'}
+        width={list.width || 'normal'}
         parentId={list.parentId || ''}
         items={list.items || []}
         sortMode={list.sortMode || 'manual'}

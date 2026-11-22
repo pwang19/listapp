@@ -34,6 +34,7 @@
  * @property {string} color
  * @property {string} icon
  * @property {string} theme
+ * @property {'normal'|'wide'|'full'} width
  * @property {string} parentId
  * @property {boolean} isFolder
  * @property {ListCustomField[]} customFields

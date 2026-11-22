@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useId } from 'react';
+import React, { useState, useMemo, useRef, useId, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
   DndContext,
@@ -17,7 +17,8 @@ import {
 import EditableText from '../ui/EditableText';
 import ListItemDisplay from './ListItemDisplay';
 import ListCustomizePopover from './ListCustomizePopover';
-import { LIST_COLORS } from '../../utils/constants';
+import useDismissable from '../../hooks/useDismissable';
+import { LIST_COLORS, LIST_WIDTHS } from '../../utils/constants';
 import { filterItems } from '../../utils/filterItems';
 import { sortItems } from '../../utils/sortItems';
 import { listToMarkdown } from '../../utils/helpers';
@@ -31,6 +32,82 @@ const itemShape = PropTypes.shape({
   text: PropTypes.string.isRequired,
   complete: PropTypes.bool,
 });
+
+const WIDTH_IDS = LIST_WIDTHS.map((w) => w.id);
+
+// Maps a dragged card width to the nearest column span the grid can show.
+function widthForSpan(span, columnCount) {
+  if (span <= 1) return 'normal';
+  if (span >= columnCount) return 'full';
+  return 'wide';
+}
+
+function ListResizeHandle({ width, onChange }) {
+  const dragRef = useRef(null);
+
+  const handlePointerDown = (event) => {
+    const card = event.currentTarget.closest('.list-card');
+    const grid = card?.closest('.lists-grid, .folder-children');
+    if (!card || !grid) return;
+    const styles = getComputedStyle(grid);
+    const columns = styles.gridTemplateColumns.split(' ').filter(Boolean);
+    const columnWidth = parseFloat(columns[0]) || card.offsetWidth;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      startX: event.clientX,
+      startWidth: card.getBoundingClientRect().width,
+      columnCount: columns.length,
+      columnWidth,
+      gap: parseFloat(styles.columnGap) || 0,
+      last: width,
+    };
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const target = drag.startWidth + (event.clientX - drag.startX);
+    const span = Math.round((target + drag.gap) / (drag.columnWidth + drag.gap));
+    const next = widthForSpan(Math.min(Math.max(span, 1), drag.columnCount), drag.columnCount);
+    if (next !== drag.last) {
+      drag.last = next;
+      onChange(next);
+    }
+  };
+
+  const endDrag = () => {
+    dragRef.current = null;
+  };
+
+  const handleKeyDown = (event) => {
+    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const index = WIDTH_IDS.indexOf(width);
+    const next = WIDTH_IDS[Math.min(Math.max(index + step, 0), WIDTH_IDS.length - 1)];
+    if (next !== width) onChange(next);
+  };
+
+  return (
+    <button
+      type="button"
+      className="list-resize-handle"
+      aria-label="Resize list width"
+      title="Drag to resize (or use ← →)"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onKeyDown={handleKeyDown}
+    />
+  );
+}
+
+ListResizeHandle.propTypes = {
+  width: PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+};
 
 function ListDropZone({ listId, children }) {
   const { setNodeRef, isOver } = useDroppable({ id: `list-drop-${listId}` });
@@ -47,6 +124,7 @@ function List({
   color = 'slate',
   icon = '📋',
   theme = 'none',
+  width = 'normal',
   customFields = [],
   parentId = '',
   items = [],
@@ -95,6 +173,8 @@ function List({
   const titleId = useId();
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const iconButtonRef = useRef(null);
+  const menuButtonRef = useRef(null);
+  const menuRef = useRef(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -155,7 +235,8 @@ function List({
     onShare?.('Markdown copied to clipboard.');
   };
 
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  useDismissable(menuOpen, [menuRef, menuButtonRef], closeMenu);
 
   return (
     <ListDropZone listId={listId}>
@@ -168,8 +249,12 @@ function List({
           ...getListThemeStyle(colorMeta.value, theme),
         }}
       >
+        {onSetListMeta ? (
+          <ListResizeHandle width={width} onChange={(next) => onSetListMeta({ width: next })} />
+        ) : null}
         <div className="list-card-top-actions">
           <button
+            ref={menuButtonRef}
             type="button"
             className="icon-button"
             onClick={() => setMenuOpen((v) => !v)}
@@ -182,7 +267,7 @@ function List({
         </div>
 
         {menuOpen ? (
-          <div className="list-menu" role="menu">
+          <div ref={menuRef} className="list-menu" role="menu">
             <button type="button" role="menuitem" onClick={() => { onDuplicate(); closeMenu(); }}>
               Duplicate list
             </button>
@@ -259,6 +344,7 @@ function List({
             icon={icon}
             color={color}
             theme={theme}
+            width={width}
             sortMode={sortMode}
             customFields={customFields}
             parentId={parentId}
@@ -362,6 +448,7 @@ List.propTypes = {
   color: PropTypes.string,
   icon: PropTypes.string,
   theme: PropTypes.string,
+  width: PropTypes.string,
   customFields: PropTypes.array,
   parentId: PropTypes.string,
   items: PropTypes.arrayOf(itemShape),

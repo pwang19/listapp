@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
+import useDismissable from '../../hooks/useDismissable';
 import PropTypes from 'prop-types';
-import { LIST_COLORS, LIST_ICONS, SORT_MODES } from '../../utils/constants';
+import { LIST_COLORS, LIST_ICONS, LIST_WIDTHS, SORT_MODES } from '../../utils/constants';
 import { LIST_THEMES } from '../../utils/listThemes';
 import { createId } from '../../utils/ids';
 
@@ -19,6 +20,7 @@ function ListCustomizePopover({
   icon,
   color,
   theme = 'none',
+  width = 'normal',
   sortMode,
   customFields = [],
   parentId = '',
@@ -30,26 +32,7 @@ function ListCustomizePopover({
 }) {
   const popoverRef = useRef(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        popoverRef.current?.contains(event.target) ||
-        anchorRef?.current?.contains(event.target)
-      ) {
-        return;
-      }
-      onClose();
-    };
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [onClose, anchorRef]);
+  useDismissable(true, [popoverRef, anchorRef], onClose);
 
   useEffect(() => {
     popoverRef.current?.querySelector('button, select')?.focus();
@@ -118,6 +101,22 @@ function ListCustomizePopover({
                 onClose();
               }}
               aria-pressed={theme === opt.id}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="list-customize-section">
+        <span className="list-customize-label">Width</span>
+        <div className="width-picker" role="group" aria-label="List width">
+          {LIST_WIDTHS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={`theme-grid-btn${width === opt.id ? ' is-active' : ''}`}
+              onClick={() => onSetListMeta({ width: opt.id })}
+              aria-pressed={width === opt.id}
             >
               {opt.label}
             </button>
@@ -194,6 +193,7 @@ ListCustomizePopover.propTypes = {
   icon: PropTypes.string.isRequired,
   color: PropTypes.string.isRequired,
   theme: PropTypes.string,
+  width: PropTypes.string,
   sortMode: PropTypes.string.isRequired,
   customFields: PropTypes.array,
   parentId: PropTypes.string,

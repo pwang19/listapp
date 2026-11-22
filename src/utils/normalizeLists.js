@@ -1,5 +1,5 @@
 import { createId } from './ids';
-import { LIST_COLORS, LIST_ICONS, RECURRING_OPTIONS } from './constants';
+import { LIST_COLORS, LIST_ICONS, LIST_WIDTHS, RECURRING_OPTIONS } from './constants';
 import { LIST_THEME_IDS } from './listThemes';
 import { getAllTags, resolveTagId } from './tags';
 
@@ -7,6 +7,7 @@ const CUSTOM_FIELD_TYPES = new Set(['text', 'url', 'number', 'checkbox']);
 
 const validColorIds = new Set(LIST_COLORS.map((c) => c.id));
 const validIcons = new Set(LIST_ICONS);
+const validWidths = new Set(LIST_WIDTHS.map((w) => w.id));
 const validRecurring = new Set(RECURRING_OPTIONS.map((r) => r.id));
 
 export function migrateLegacyPriority(priority) {
@@ -139,6 +140,7 @@ export function normalizeList(list = {}, customTags = []) {
     typeof list.theme === 'string' && LIST_THEME_IDS.has(list.theme)
       ? list.theme
       : 'none';
+  const width = validWidths.has(list.width) ? list.width : 'normal';
   const parentId = typeof list.parentId === 'string' ? list.parentId : '';
   const isFolder = Boolean(list.isFolder);
   const customFields = Array.isArray(list.customFields)
@@ -157,6 +159,7 @@ export function normalizeList(list = {}, customTags = []) {
     color,
     icon,
     theme,
+    width,
     parentId,
     isFolder,
     customFields,

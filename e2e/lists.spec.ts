@@ -13,6 +13,43 @@ test.describe('lists', () => {
     await expect(errands.item('Buy milk')).toBeVisible();
   });
 
+  test('the list menu closes on an outside click or Escape', async ({ listsPage, page }) => {
+    const errands = await listsPage.addList('Errands');
+    const menuButton = errands.root.getByRole('button', { name: 'List menu' });
+    const menu = errands.root.getByRole('menu');
+
+    await menuButton.click();
+    await expect(menu).toBeVisible();
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await expect(menu).toBeHidden();
+
+    await menuButton.click();
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+
+    await menuButton.click();
+    await menuButton.click();
+    await expect(menu).toBeHidden();
+  });
+
+  test('a list can be widened and stays wide after reload', async ({ listsPage, page }) => {
+    await page.setViewportSize({ width: 1200, height: 900 });
+    const errands = await listsPage.addList('Errands');
+    await listsPage.addList('Work');
+    const normalWidth = (await errands.root.boundingBox())!.width;
+
+    await errands.setWidth('Wide');
+    await expect.poll(async () => (await errands.root.boundingBox())!.width).toBeGreaterThan(normalWidth * 1.8);
+
+    await page.reload();
+    await expect.poll(async () => (await errands.root.boundingBox())!.width).toBeGreaterThan(normalWidth * 1.8);
+
+    await errands.setWidth('Full row');
+    const grid = (await page.locator('.lists-grid').boundingBox())!;
+    await expect.poll(async () => (await errands.root.boundingBox())!.width).toBeGreaterThan(grid.width - 40);
+  });
+
   test('search narrows the grid to matching items', async ({ listsPage }) => {
     const errands = await listsPage.addList('Errands');
     await errands.addItem('Buy milk');
